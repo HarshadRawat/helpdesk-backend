@@ -1,442 +1,153 @@
-# HelpDesk - Ticket Management System
+# HelpDesk Backend
 
-A backend REST API for managing IT support tickets using Spring Boot, Spring Security, JWT authentication, JPA/Hibernate, and MySQL.
+A production-oriented Spring Boot backend for a HelpDesk and ticket management system. The application provides secure authentication, role-based access control, ticket lifecycle management, audit support, and a Docker-ready deployment setup.
 
-The application simulates a real-world IT HelpDesk system where customers can raise support tickets, agents can work on assigned tickets, and administrators can manage tickets and assignments.
+This project is built as a backend-only API service and is designed for real-world ticket workflows in an IT support environment.
 
----
+## Overview
 
-## 📌 Project Overview
+The system models a typical internal support workflow:
 
-In a typical organization, employees may face technical issues such as:
+- users create support tickets
+- agents manage assigned tickets
+- admins oversee assignments and ticket operations
+- the API enforces ownership and role-based access rules
+- users authenticate through JWT tokens
+- the system persists data using MySQL and Flyway migrations
 
-- Wi-Fi not working
-- Printer problems
-- Software issues
-- System or network problems
+## Features
 
-Instead of directly contacting the IT team, users can create a support ticket through the HelpDesk system.
+- User registration and login
+- JWT-based authentication and authorization
+- Role-based access for CUSTOMER, AGENT, and ADMIN roles
+- Ticket creation, update, assignment, and deletion
+- Ticket status and priority management
+- Comment support on tickets
+- Pagination and filtering for ticket queries
+- Validation and centralized exception handling
+- BCrypt password hashing
+- Refresh-token rotation and reuse detection for secure auth flows
+- Request ID tracking and rate limiting support
+- Audit logging and admin workload reporting
+- Docker Compose deployment support
 
-The ticket can then be assigned to an agent and progresses through different stages until the issue is resolved and closed.
-
----
-
-## ✨ Features
-
-- User creation and login
-- JWT-based authentication
-- Role-based authorization
-- Three user roles:
-    - CUSTOMER
-    - AGENT
-    - ADMIN
-- Create, view, update, and delete tickets
-- Assign tickets to agents
-- Ticket status management
-- Ticket priority management
-- Comments on tickets
-- Pagination
-- Ticket filtering by status and priority
-- Input validation
-- Global exception handling
-- Password hashing using BCrypt
-- MySQL database integration
-- JPA/Hibernate ORM
-
----
-
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Technology | Purpose |
-|------------|---------|
+| --- | --- |
 | Java 17 | Backend runtime |
-| Spring Boot 4 | Backend framework |
+| Spring Boot 4 | Application framework |
 | Spring Web MVC | REST API development |
-| Spring Data JPA | Database access |
-| Hibernate | ORM |
+| Spring Data JPA | Persistence layer |
 | Spring Security | Authentication and authorization |
 | JWT | Token-based authentication |
-| MySQL | Relational database |
+| MySQL | Primary database |
 | Flyway | Database migrations |
-| Actuator | Health and operational monitoring |
-| Micrometer + Prometheus | Metrics |
-| JavaMail | Email notifications |
-| Maven | Dependency management |
-| Docker | Containerization |
-| Postman | API testing |
-| IntelliJ IDEA | Development |
-
----
-
-## 🚀 Production-ready setup
-
-### Production security basics
-
-Before deploying to a real environment, place secrets outside the repository:
-
-- DB credentials
-- JWT secret
-- SMTP credentials
-- any production certificates or keys
-
-Recommended approaches:
-
-- environment variables
-- Docker secrets / Kubernetes secrets
-- AWS Secrets Manager / Azure Key Vault / HashiCorp Vault
-
-Example:
-
-```bash
-export DB_URL=jdbc:mysql://prod-db:3306/helpdesk_db
-export DB_USERNAME=helpdesk_app
-export DB_PASSWORD=your_secure_password
-export JWT_SECRET=your_long_secure_secret_key_32_chars_plus
-
-export SPRING_PROFILES_ACTIVE=prod
-```
-
-### API documentation
-
-The backend exposes Swagger UI and OpenAPI docs once the app is running:
-
-- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
-- Swagger UI: `http://localhost:8080/swagger-ui.html`
-
-This helps with API contract visibility, testing, and frontend/backend integration in a production environment.
-
-### Docker deployment validation
-
-The repository includes a Docker Compose stack for the app, MySQL, and Nginx. The compose file is valid for local deployment validation, but Docker itself must be running on the host before starting the stack.
-
-A default bootstrap admin can be created automatically when the app starts. It should only be enabled for local/dev setup; keep it off in production.
-
-```bash
-export APP_BOOTSTRAP_ADMIN_ENABLED=false
-export APP_BOOTSTRAP_ADMIN_NAME=Admin
-export APP_BOOTSTRAP_ADMIN_EMAIL=admin@localhost
-export APP_BOOTSTRAP_ADMIN_PASSWORD=change-me-admin-password
-```
-
-Use environment variables instead of hardcoded secrets and demo config:
-
-```bash
-export DB_URL=jdbc:mysql://localhost:3306/helpdesk_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-export DB_USERNAME=root
-export DB_PASSWORD=your_secure_db_password
-export JWT_SECRET=your_long_secure_secret_key
-export SERVER_PORT=8080
-export SPRING_PROFILES_ACTIVE=prod
-```
-
-Development profile:
-
-```bash
-export SPRING_PROFILES_ACTIVE=dev
-```
-
-Health checks:
-
-```bash
-curl http://localhost:8080/actuator/health
-```
-
-Docker compose:
-
-```bash
-docker compose up --build
-```
-
----
-
-## 🏗️ Architecture
-
-The project follows a layered architecture:
-
-```text
-                    Client / Postman
-                           |
-                           ↓
-                    Controller Layer
-                           |
-                           ↓
-                     Service Layer
-                           |
-                           ↓
-                   Repository Layer
-                           |
-                           ↓
-                    JPA / Hibernate
-                           |
-                           ↓
-                         MySQL
-```
-
-### Controller Layer
-
-Handles HTTP requests and responses.
-
-### Service Layer
-
-Contains the application's business logic, such as:
-
-- Ticket ownership checks
-- Role-based access
-- Ticket assignment
-- Status transition validation
-
-### Repository Layer
-
-Uses Spring Data JPA to communicate with the database.
-
-### Entity Layer
-
-Represents the main database entities:
-
-- User
-- Ticket
-- Comment
-
-### DTO Layer
-
-DTOs are used to control the data sent to and received from REST APIs instead of directly exposing entities.
-
----
-
-## 👥 User Roles
-
-### CUSTOMER
-
-Customers can:
-
-- Create tickets
-- View their own tickets
-- Update their own tickets
-- Delete their own tickets
-- Add comments
-
-A customer cannot access another customer's ticket.
-
-### AGENT
-
-Agents can:
-
-- View tickets assigned to them
-- Update assigned tickets
-- Update ticket status
-- Add comments
-
-An agent cannot access tickets that are not assigned to them.
-
-### ADMIN
-
-Administrators have broader access and can:
-
-- View all tickets
-- Update tickets
-- Delete tickets
-- Assign tickets to agents
-- Manage users
-
----
-
-## 🎫 Ticket Lifecycle
-
-Tickets follow a controlled workflow:
-
-```text
-OPEN
-  ↓
-IN_PROGRESS
-  ↓
-RESOLVED
-  ↓
-CLOSED
-```
-
-The application prevents invalid status transitions.
-
-For example:
-
-```text
-OPEN → RESOLVED
-```
-
-is not allowed directly.
-
----
-
-## 🔐 Authentication Flow
-
-The application uses JWT for authentication.
-
-### Login
-
-```text
-User
-  |
-  | Login
-  ↓
-Auth Controller
-  |
-  ↓
-Validate credentials
-  |
-  ↓
-Generate JWT
-  |
-  ↓
-Return token
-```
-
-### Subsequent Requests
-
-The client sends the JWT in the `Authorization` header:
-
-```text
-Authorization: Bearer <JWT>
-```
-
-The request then follows this flow:
+| Hibernate | ORM |
+| Maven | Dependency management and build |
+| Docker / Docker Compose | Containerized local deployment |
+| Actuator | Health and monitoring |
+| H2 | In-memory test database |
+
+## Architecture
+
+The application follows a standard layered backend structure:
 
 ```text
 Client
-  |
   ↓
-JWT Filter
-  |
+Controller Layer
   ↓
-Extract User ID + Role
-  |
+Service Layer
   ↓
-Security Context
-  |
+Repository Layer
   ↓
-Controller
-  |
+JPA / Hibernate
   ↓
-Service
+MySQL / H2
 ```
 
-The JWT contains:
+This keeps responsibilities separated between HTTP handling, business logic, data access, and persistence.
 
-- User ID
-- User role
-- Issued time
-- Expiration time
-
----
-
-## 🔒 Authorization
-
-Authorization is enforced based on the authenticated user's role and ownership.
-
-### Customer Access
+## Project Structure
 
 ```text
-Customer
-   |
-   ├── Own ticket → ALLOWED
-   |
-   └── Another customer's ticket → DENIED
+src/
+├── main/
+│   ├── java/com/example/helpdesk_backend/
+│   │   ├── bootstrap/
+│   │   ├── controller/
+│   │   ├── dto/
+│   │   ├── entity/
+│   │   ├── exception/
+│   │   ├── repository/
+│   │   ├── security/
+│   │   ├── service/
+│   │   └── HelpdeskBackendApplication.java
+│   └── resources/
+│       ├── application.properties
+│       ├── application-dev.properties
+│       ├── application-prod.properties
+│       └── db/migration/
+└── test/
+    └── java/com/example/helpdesk_backend/
 ```
 
-### Agent Access
+## Authentication and Authorization
+
+The API uses JWT-based authentication with Spring Security.
+
+Core security behavior includes:
+
+- login endpoint for generating auth tokens
+- refresh-token rotation and reuse detection
+- role-based access checks for ticket and user endpoints
+- request filtering and rate limiting
+- audit tracking for operational visibility
+
+## User Roles
+
+### CUSTOMER
+- create tickets
+- view their own tickets
+- update their own tickets
+- add comments to their tickets
+
+### AGENT
+- view assigned tickets
+- process assigned ticket workflows
+- update status and comments
+
+### ADMIN
+- view all tickets and data
+- perform operational assignments
+- manage high-level ticket administration
+
+## Ticket Lifecycle
+
+The system supports a structured ticket workflow:
 
 ```text
-Agent
-   |
-   ├── Assigned ticket → ALLOWED
-   |
-   └── Unassigned / another agent's ticket → DENIED
+OPEN → IN_PROGRESS → RESOLVED → CLOSED
 ```
 
-Administrators can access tickets across the system.
+The business logic prevents invalid transitions and enforces ownership/assignment rules before state changes are allowed.
 
-Unauthorized requests return:
-
-```text
-HTTP 403 Forbidden
-```
-
----
-
-## 🗄️ Database Design
-
-The main entities are:
-
-```text
-User
-  |
-  | 1
-  |
-  | *
-Ticket
-  |
-  | 1
-  |
-  | *
-Comment
-```
-
-A `Ticket` is associated with:
-
-- The user who created it
-- The agent assigned to it
-
-A `Comment` is associated with:
-
-- A ticket
-- The user who created the comment
-
-### User
-
-Stores:
-
-- ID
-- Name
-- Email
-- Password
-- Role
-
-### Ticket
-
-Stores:
-
-- ID
-- Title
-- Description
-- Priority
-- Status
-- Created By
-- Assigned To
-
-### Comment
-
-Stores:
-
-- ID
-- Message
-- Ticket
-- User
-
-A ticket can have multiple comments.
-
----
-
-## 🌐 API Endpoints
+## Core API Endpoints
 
 ### Authentication
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/login` | Login and receive JWT |
+| --- | --- | --- |
+| POST | `/api/auth/login` | User login |
+| POST | `/api/auth/refresh` | Refresh access token |
+| POST | `/api/auth/logout` | Logout user and revoke refresh token |
 
 ### Users
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/users` | Get users |
+| --- | --- | --- |
+| GET | `/api/users` | List users |
 | GET | `/api/users/{id}` | Get user by ID |
 | POST | `/api/users` | Create user |
 | PUT | `/api/users/{id}` | Update user |
@@ -444,212 +155,48 @@ A ticket can have multiple comments.
 ### Tickets
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| --- | --- | --- |
 | POST | `/api/tickets` | Create ticket |
-| GET | `/api/tickets` | Get tickets based on user role |
+| GET | `/api/tickets` | View tickets for the authenticated user |
 | GET | `/api/tickets/{id}` | Get ticket by ID |
 | PUT | `/api/tickets/{id}` | Update ticket |
 | DELETE | `/api/tickets/{id}` | Delete ticket |
-
-### Ticket Operations
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| PUT | `/api/tickets/{id}/assign` | Assign ticket to an agent |
+| PUT | `/api/tickets/{id}/assign` | Assign ticket to agent |
 | PUT | `/api/tickets/{id}/status` | Update ticket status |
 
-### Pagination & Filtering
+## Local Development Setup
 
-Get paginated tickets:
+### Prerequisites
 
-```http
-GET /api/tickets/paged?page=0&size=20
-```
+- Java 17+
+- Maven
+- MySQL (for local runtime)
+- Docker (optional, for containerized local setup)
 
-Filter by status:
-
-```http
-GET /api/tickets/paged?status=OPEN&page=0&size=20
-```
-
-Filter by priority:
-
-```http
-GET /api/tickets/paged?priority=HIGH&page=0&size=20
-```
-
-Filter by both status and priority:
-
-```http
-GET /api/tickets/paged?status=OPEN&priority=HIGH&page=0&size=20
-```
-
-The results are also restricted according to the authenticated user's role.
-
----
-
-## 💬 Comments
-
-Users can add comments to tickets.
-
-### Endpoint
-
-```http
-POST /api/tickets/{ticketId}/comments
-```
-
-### Request
-
-```json
-{
-  "message": "The printer is working now."
-}
-```
-
-The authenticated user is automatically associated with the comment.
-
----
-
-## ⚠️ Exception Handling
-
-The application uses centralized exception handling through a global exception handler.
-
-Examples include:
-
-- Ticket not found
-- User not found
-- Invalid login
-- Duplicate email
-- Invalid ticket status
-- Invalid ticket assignment
-- Validation errors
-- Unauthorized access
-
-Example response:
-
-```json
-{
-  "message": "Ticket not found with id: 100"
-}
-```
-
----
-
-## ✅ Input Validation
-
-Request DTOs use Jakarta Bean Validation.
-
-For example:
-
-```java
-@NotBlank
-private String title;
-```
-
-This prevents invalid requests such as an empty ticket title.
-
----
-
-## 🔑 Password Security
-
-Passwords are not stored as plain text.
-
-The application uses BCrypt for password hashing:
-
-```text
-Plain Password
-      ↓
-    BCrypt
-      ↓
-Hashed Password
-      ↓
-    MySQL
-```
-
----
-
-## 📁 Project Structure
-
-```text
-src/main/java/com/example/helpdesk_backend/
-
-├── controller/
-│   ├── AuthController.java
-│   ├── UserController.java
-│   ├── TicketController.java
-│   └── CommentController.java
-│
-├── service/
-│   ├── TicketService.java
-│   ├── UserService.java
-│   └── CommentService.java
-│
-├── repository/
-│   ├── TicketRepository.java
-│   ├── UserRepository.java
-│   └── CommentRepository.java
-│
-├── entity/
-│   ├── User.java
-│   ├── Ticket.java
-│   └── Comment.java
-│
-├── dto/
-│   ├── LoginRequest.java
-│   ├── RegisterRequest.java
-│   ├── TicketRequest.java
-│   ├── TicketResponse.java
-│   ├── TicketUpdateRequest.java
-│   └── CommentRequest.java
-│
-├── security/
-│   ├── SecurityConfig.java
-│   ├── JwtFilter.java
-│   └── JwtService.java
-│
-└── exception/
-    └── GlobalExceptionHandler.java
-```
-
----
-
-## ⚙️ Setup & Installation
-
-### 1. Clone the repository
+### Clone the Repository
 
 ```bash
-git clone <your-github-repository-url>
+git clone <repository-url>
+cd helpdesk-backend
 ```
 
-### 2. Create the MySQL database
+### Configure Environment Variables
 
-```sql
-CREATE DATABASE helpdesk_db;
+Use environment variables or a local `.env` file for runtime secrets.
+
+Example:
+
+```bash
+export DB_URL=jdbc:mysql://localhost:3306/helpdesk_db
+export DB_USERNAME=root
+export DB_PASSWORD=your_secure_password
+export JWT_SECRET=your_long_secure_secret_key
+export SPRING_PROFILES_ACTIVE=dev
 ```
 
-### 3. Configure the database
+### Run the Application
 
-The application uses an environment variable for the database password.
-
-In `application.properties`:
-
-```properties
-spring.application.name=helpdesk-backend
-
-spring.datasource.url=jdbc:mysql://localhost:3306/helpdesk_db
-spring.datasource.username=root
-spring.datasource.password=${DB_PASSWORD}
-
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
-spring.jpa.properties.hibernate.format_sql=true
-```
-
-Set the `DB_PASSWORD` environment variable on your system.
-
-### 4. Run the application
-
-Using Maven:
+Using Maven wrapper:
 
 ```bash
 ./mvnw spring-boot:run
@@ -657,106 +204,93 @@ Using Maven:
 
 On Windows:
 
-```bash
+```powershell
 mvnw.cmd spring-boot:run
 ```
 
-The application will start on:
+The application starts on the configured server port, typically:
 
 ```text
 http://localhost:8080
 ```
 
----
+## Docker Setup
 
-## 🧪 Testing
+The project includes Docker Compose support for running the backend and MySQL together.
 
-The APIs were tested using Postman.
-
-Important scenarios tested include:
-
-- Successful login
-- JWT authentication
-- Customer accessing own ticket
-- Customer attempting to access another customer's ticket
-- Agent accessing assigned ticket
-- Agent attempting to access an unassigned ticket
-- Admin accessing tickets
-- Ticket creation
-- Ticket updates
-- Ticket assignment
-- Status transitions
-- Pagination
-- Status filtering
-- Priority filtering
-- Combined filtering
-- Validation errors
-- Exception handling
-
----
-
-## 🔄 Example End-to-End Flow
-
-```text
-1. User logs in
-       ↓
-2. Server validates credentials
-       ↓
-3. JWT token is generated
-       ↓
-4. Client sends JWT with requests
-       ↓
-5. Customer creates a ticket
-       ↓
-6. Admin assigns the ticket to an agent
-       ↓
-7. Agent views the assigned ticket
-       ↓
-8. Agent changes the ticket status
-       ↓
-OPEN → IN_PROGRESS → RESOLVED
-       ↓
-9. Ticket is closed
+```bash
+docker compose up --build
 ```
 
----
+This is suitable for local validation and testing deployment behavior in a production-like environment.
 
-## 🎯 Key Backend Concepts Demonstrated
+## Database and Migration Notes
 
-This project demonstrates practical backend development concepts including:
+The backend uses Flyway for schema management. Database migrations live under:
 
-- REST API development
-- Layered architecture
-- Dependency Injection
-- DTO pattern
-- JPA/Hibernate
-- Entity relationships
-- Spring Data JPA
-- Authentication
-- JWT
-- Role-based authorization
-- Password hashing
-- Input validation
-- Exception handling
-- Pagination
-- Filtering
-- Business logic
-- HTTP status codes
-- MySQL database integration
+```text
+src/main/resources/db/migration/
+```
 
----
+This keeps schema changes repeatable and consistent across environments.
 
-## 🚀 Future Improvements
+## Security Notes
 
-Possible future improvements include:
+Before production deployment, keep secrets outside source control.
 
-- Email notifications
-- File attachments
-- Ticket search
-- Audit logs
-- Automated tests
-- Docker deployment
-- Production deployment
+Recommended approaches:
+
+- environment variables
+- Docker secrets
+- cloud secret managers such as AWS Secrets Manager, Azure Key Vault, or HashiCorp Vault
+
+Do not commit production credentials, private keys, or real JWT secrets into the repository.
+
+## Testing
+
+The project includes Spring Boot test coverage for core application startup and backend security logic.
+
+Run the full test suite with:
+
+```bash
+./mvnw test
+```
+
+On Windows:
+
+```powershell
+mvnw.cmd test
+```
+
+## Health and Monitoring
+
+The app exposes Spring Boot Actuator endpoints for health and runtime diagnostics.
+
+Example:
+
+```bash
+curl http://localhost:8080/actuator/health
+```
+
+## Production Readiness
+
+This backend is structured for real application use and includes several production-oriented patterns, including:
+
+- environment-based configuration
+- JWT lifecycle security
+- validation and exceptions
+- request tracking
+- rate limiting support
+- Docker-based deployment setup
+- migration-based schema management
+
+## License
+
+This project is provided as a backend development sample and is intended for learning and portfolio use.
+
+## Contact
+
+For questions or collaboration, please reach out via the project repository or contact information linked to the repository owner.
 
 ---
 
