@@ -1,5 +1,7 @@
 package com.example.helpdesk_backend.security;
 
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +25,15 @@ public class JwtFilter extends OncePerRequestFilter {
     }
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return "/api/auth/login".equals(path)
+                || "/api/auth/refresh".equals(path)
+                || "/api/auth/logout".equals(path)
+                || "/api/users".equals(path) && "POST".equalsIgnoreCase(request.getMethod());
+    }
+
+    @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
@@ -32,24 +43,47 @@ public class JwtFilter extends OncePerRequestFilter {
         String authHeader = request.getHeader("Authorization");
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-
             String token = authHeader.substring(7);
 
-            String userId = jwtService.extractUserId(token);
-            String role = jwtService.extractRole(token);
+            try {
+                String userId = jwtService.extractUserId(token);
+                String role = jwtService.extractRole(token);
 
-            UsernamePasswordAuthenticationToken authentication =
-                    new UsernamePasswordAuthenticationToken(
-                            userId,
-                            null,
-                            Collections.singletonList(
-                                    new SimpleGrantedAuthority("ROLE_" + role)
-                            )
-                    );
+                if ("REFRESH".equals(jwtService.extractTokenType(token))) {
+                    SecurityContextHolder.clearContext();
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"message\":\"Refresh token not allowed for access\"}");
+                    return;
+                }
 
-            SecurityContextHolder
-                    .getContext()
-                    .setAuthentication(authentication);
+                if (role == null || role.isBlank()) {
+                    throw new JwtException("Missing role claim");
+                }
+
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                userId,
+                                null,
+                                Collections.singletonList(
+                                        new SimpleGrantedAuthority("ROLE_" + role)
+                                )
+                        );
+
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } catch (ExpiredJwtException e) {
+                SecurityContextHolder.clearContext();
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"message\":\"Token expired\"}");
+                return;
+            } catch (JwtException e) {
+                SecurityContextHolder.clearContext();
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"message\":\"Invalid token\"}");
+                return;
+            }
         }
 
         filterChain.doFilter(request, response);

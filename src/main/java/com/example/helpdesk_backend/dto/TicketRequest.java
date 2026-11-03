@@ -2,6 +2,7 @@ package com.example.helpdesk_backend.dto;
 
 import com.example.helpdesk_backend.enums.Priority;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 public class TicketRequest {
 
@@ -11,6 +12,7 @@ public class TicketRequest {
     @NotBlank
     private String description;
 
+    @NotNull
     private Priority priority;
 
     public String getTitle() {

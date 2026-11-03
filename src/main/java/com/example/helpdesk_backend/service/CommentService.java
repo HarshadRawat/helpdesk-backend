@@ -44,10 +44,25 @@ public class CommentService {
         Authentication authentication =
                 SecurityContextHolder.getContext().getAuthentication();
 
+        if (authentication == null || authentication.getName() == null) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied");
+        }
+
         Long userId = Long.valueOf(authentication.getName());
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
+
+        String role = authentication.getAuthorities().stream()
+                .findFirst()
+                .map(grantedAuthority -> grantedAuthority.getAuthority())
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Access denied"));
+
+        if (!"ROLE_ADMIN".equals(role)
+                && !"ROLE_AGENT".equals(role)
+                && !("ROLE_CUSTOMER".equals(role) && ticket.getCreatedBy() != null && ticket.getCreatedBy().getId().equals(userId))) {
+            throw new org.springframework.security.access.AccessDeniedException("You cannot comment on this ticket");
+        }
 
         Comment comment = new Comment();
 
@@ -62,8 +77,24 @@ public class CommentService {
 
     public List<CommentResponse> getComments(Long ticketId) {
 
-        if (!ticketRepository.existsById(ticketId)) {
-            throw new TicketNotFoundException(ticketId);
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new TicketNotFoundException(ticketId));
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied");
+        }
+
+        Long userId = Long.valueOf(authentication.getName());
+        String role = authentication.getAuthorities().stream()
+                .findFirst()
+                .map(grantedAuthority -> grantedAuthority.getAuthority())
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Access denied"));
+
+        if (!"ROLE_ADMIN".equals(role)
+                && !("ROLE_AGENT".equals(role) && ticket.getAssignedTo() != null && ticket.getAssignedTo().getId().equals(userId))
+                && !("ROLE_CUSTOMER".equals(role) && ticket.getCreatedBy() != null && ticket.getCreatedBy().getId().equals(userId))) {
+            throw new org.springframework.security.access.AccessDeniedException("You cannot view comments for this ticket");
         }
 
         return commentRepository.findByTicketId(ticketId)

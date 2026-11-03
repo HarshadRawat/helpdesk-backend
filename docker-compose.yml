@@ -1,0 +1,61 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: helpdesk-backend
+    restart: on-failure
+    ports:
+      - "18080:8080"
+      - "18081:8081"
+    environment:
+      SERVER_PORT: 8080
+      DB_URL: jdbc:mysql://mysql:3306/helpdesk_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: root
+      DB_PASSWORD: change-me
+      JWT_SECRET: replace-with-a-long-random-secret
+      AUDIT_RETENTION_DAYS: 90
+      APP_BOOTSTRAP_ADMIN_ENABLED: "false"
+      APP_BOOTSTRAP_ADMIN_NAME: Admin
+      APP_BOOTSTRAP_ADMIN_EMAIL: admin@localhost
+      APP_BOOTSTRAP_ADMIN_PASSWORD: change-me-admin-password
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: helpdesk-proxy
+    depends_on:
+      - app
+    ports:
+      - "18088:80"
+      - "18443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/etc/ssl/certs:ro
+      - ./certs:/etc/ssl/private:ro
+
+  mysql:
+    image: mysql:8.0
+    container_name: helpdesk-mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: helpdesk_db
+      MYSQL_ROOT_PASSWORD: password
+    ports:
+      - "33306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-ppassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  mysql-data:

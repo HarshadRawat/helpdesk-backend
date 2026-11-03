@@ -2,6 +2,7 @@ package com.example.helpdesk_backend.controller;
 
 import com.example.helpdesk_backend.dto.LoginRequest;
 import com.example.helpdesk_backend.dto.LoginResponse;
+import com.example.helpdesk_backend.dto.RefreshTokenRequest;
 import com.example.helpdesk_backend.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
@@ -20,8 +21,16 @@ public class AuthController {
     public LoginResponse login(
             @Valid @RequestBody LoginRequest request) {
 
-        String token = authService.login(request);
+        return authService.login(request);
+    }
 
-        return new LoginResponse(token);
+    @PostMapping("/refresh")
+    public LoginResponse refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
+        return authService.refreshToken(request.getRefreshToken());
+    }
+
+    @PostMapping("/logout")
+    public void logout(@Valid @RequestBody RefreshTokenRequest request) {
+        authService.logout(request.getRefreshToken());
     }
 }

@@ -2,77 +2,79 @@ package com.example.helpdesk_backend.service;
 
 import com.example.helpdesk_backend.dto.*;
 import com.example.helpdesk_backend.entity.Ticket;
+import com.example.helpdesk_backend.entity.User;
+import com.example.helpdesk_backend.enums.Priority;
+import com.example.helpdesk_backend.enums.Role;
 import com.example.helpdesk_backend.enums.Status;
 import com.example.helpdesk_backend.exception.InvalidTicketAssignmentException;
 import com.example.helpdesk_backend.exception.InvalidTicketStatusException;
 import com.example.helpdesk_backend.exception.TicketNotFoundException;
+import com.example.helpdesk_backend.exception.UserNotFoundException;
 import com.example.helpdesk_backend.repository.TicketRepository;
 import com.example.helpdesk_backend.repository.UserRepository;
-import com.example.helpdesk_backend.enums.Priority;
-import com.example.helpdesk_backend.enums.Status;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import jakarta.validation.Valid;
-
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.access.AccessDeniedException;
-
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import com.example.helpdesk_backend.entity.User;
-import com.example.helpdesk_backend.exception.UserNotFoundException;
-import com.example.helpdesk_backend.enums.Role;
-
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Page;
-
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class TicketService {
+    private static final String ROLE_ADMIN = "ROLE_ADMIN";
+    private static final String ROLE_CUSTOMER = "ROLE_CUSTOMER";
+    private static final String ROLE_AGENT = "ROLE_AGENT";
+
+    private static final String ACTION_VIEW = "access";
+    private static final String ACTION_UPDATE = "update";
+    private static final String ACTION_DELETE = "delete";
+
+    private static final String MESSAGE_ACCESS_DENIED = "Access denied";
+
 
     private final TicketRepository ticketRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
+    private final AuditLogService auditLogService;
 
     public TicketService(
             TicketRepository ticketRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            NotificationService notificationService,
+            AuditLogService auditLogService) {
 
         this.ticketRepository = ticketRepository;
         this.userRepository = userRepository;
+        this.notificationService = notificationService;
+        this.auditLogService = auditLogService;
     }
 
     public List<Ticket> getAllTickets() {
-
-        Authentication authentication =
-                SecurityContextHolder.getContext().getAuthentication();
-
-        Long userId = Long.valueOf(authentication.getName());
-
-        String role = authentication.getAuthorities()
-                .iterator()
-                .next()
-                .getAuthority();
+        Authentication authentication = getCurrentAuthentication();
+        Long userId = getCurrentUserId(authentication);
+        String role = getCurrentRole(authentication);
 
         // ADMIN → can see all tickets
-        if (role.equals("ROLE_ADMIN")) {
+        if (isAdmin(role)) {
             return ticketRepository.findAll();
         }
 
         // CUSTOMER → can see only tickets created by them
-        if (role.equals("ROLE_CUSTOMER")) {
+        if (isCustomer(role)) {
             return ticketRepository.findByCreatedById(userId);
         }
 
         // AGENT → can see only tickets assigned to them
-        if (role.equals("ROLE_AGENT")) {
+        if (isAgent(role)) {
             return ticketRepository.findByAssignedToId(userId);
         }
 
-        return List.of();
+        throw new AccessDeniedException(MESSAGE_ACCESS_DENIED);
     }
 
     public Page<Ticket> getTickets(Pageable pageable) {
@@ -80,11 +82,7 @@ public class TicketService {
     }
 
     public Ticket createTicket(TicketRequest request) {
-
-        Authentication authentication =
-                SecurityContextHolder.getContext().getAuthentication();
-
-        Long userId = Long.valueOf(authentication.getName());
+        Long userId = getCurrentUserId(getCurrentAuthentication());
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
@@ -98,7 +96,9 @@ public class TicketService {
 
         ticket.setCreatedBy(user);
 
-        return ticketRepository.save(ticket);
+        Ticket savedTicket = ticketRepository.save(ticket);
+        auditLogService.log("CREATE", "ticket", savedTicket.getId(), userId, null, savedTicket);
+        return savedTicket;
     }
 
     public Ticket getTicketById(Long id) {
@@ -106,43 +106,14 @@ public class TicketService {
         Ticket ticket = ticketRepository.findById(id)
                 .orElseThrow(() -> new TicketNotFoundException(id));
 
-        Authentication authentication =
-                SecurityContextHolder.getContext().getAuthentication();
-
-        Long userId = Long.valueOf(authentication.getName());
-
-        String role = authentication.getAuthorities()
-                .iterator()
-                .next()
-                .getAuthority();
-
-        // Admin can view any ticket
-        if (role.equals("ROLE_ADMIN")) {
-            return ticket;
-        }
-
-        // Customer can view only their own ticket
-        if (role.equals("ROLE_CUSTOMER")) {
-
-            if (!ticket.getCreatedBy().getId().equals(userId)) {
-                throw new AccessDeniedException("You cannot access this ticket");
-            }
-
-            return ticket;
-        }
-
-        // Agent can view tickets assigned to them
-        if (role.equals("ROLE_AGENT")) {
-
-            if (ticket.getAssignedTo() == null ||
-                    !ticket.getAssignedTo().getId().equals(userId)) {
-                throw new AccessDeniedException("You cannot access this ticket");
-            }
-
-            return ticket;
-        }
-
-        throw new AccessDeniedException("Access denied");
+        Authentication authentication = getCurrentAuthentication();
+        assertCanActOnTicket(
+                ticket,
+                getCurrentUserId(authentication),
+                getCurrentRole(authentication),
+                ACTION_VIEW
+        );
+        return ticket;
     }
 
     public Ticket updateTicket(Long id, TicketUpdateRequest request) {
@@ -150,49 +121,30 @@ public class TicketService {
         Ticket ticket = ticketRepository.findById(id)
                 .orElseThrow(() -> new TicketNotFoundException(id));
 
-        Authentication authentication =
-                SecurityContextHolder.getContext().getAuthentication();
+        Authentication authentication = getCurrentAuthentication();
+        Long actorId = getCurrentUserId(authentication);
+        assertCanActOnTicket(
+                ticket,
+                actorId,
+                getCurrentRole(authentication),
+                ACTION_UPDATE
+        );
 
-        Long userId = Long.valueOf(authentication.getName());
+        Ticket snapshot = new Ticket();
+        snapshot.setTitle(ticket.getTitle());
+        snapshot.setDescription(ticket.getDescription());
+        snapshot.setPriority(ticket.getPriority());
+        snapshot.setStatus(ticket.getStatus());
+        snapshot.setCreatedBy(ticket.getCreatedBy());
+        snapshot.setAssignedTo(ticket.getAssignedTo());
 
-        String role = authentication.getAuthorities()
-                .iterator()
-                .next()
-                .getAuthority();
-
-        // ADMIN → can update any ticket
-        if (role.equals("ROLE_ADMIN")) {
-            // allowed
-        }
-
-        // CUSTOMER → can update only their own ticket
-        else if (role.equals("ROLE_CUSTOMER")) {
-
-            if (!ticket.getCreatedBy().getId().equals(userId)) {
-                throw new AccessDeniedException("You cannot update this ticket");
-            }
-        }
-
-        // AGENT → can update only assigned tickets
-        else if (role.equals("ROLE_AGENT")) {
-
-            if (ticket.getAssignedTo() == null ||
-                    !ticket.getAssignedTo().getId().equals(userId)) {
-
-                throw new AccessDeniedException("You cannot update this ticket");
-            }
-        }
-
-        else {
-            throw new AccessDeniedException("Access denied");
-        }
-
-        // Authorization passed → perform the update
         ticket.setTitle(request.getTitle());
         ticket.setDescription(request.getDescription());
         ticket.setPriority(request.getPriority());
 
-        return ticketRepository.save(ticket);
+        Ticket savedTicket = ticketRepository.save(ticket);
+        auditLogService.log("UPDATE", "ticket", savedTicket.getId(), actorId, snapshot, savedTicket);
+        return savedTicket;
     }
 
     public void deleteTicket(Long id) {
@@ -200,81 +152,69 @@ public class TicketService {
         Ticket ticket = ticketRepository.findById(id)
                 .orElseThrow(() -> new TicketNotFoundException(id));
 
-        Authentication authentication =
-                SecurityContextHolder.getContext().getAuthentication();
-
-        Long userId = Long.valueOf(authentication.getName());
-
-        String role = authentication.getAuthorities()
-                .iterator()
-                .next()
-                .getAuthority();
-
-        // ADMIN → can delete any ticket
-        if (role.equals("ROLE_ADMIN")) {
-            // allowed
-        }
-
-        // CUSTOMER → can delete only their own ticket
-        else if (role.equals("ROLE_CUSTOMER")) {
-
-            if (!ticket.getCreatedBy().getId().equals(userId)) {
-                throw new AccessDeniedException("You cannot delete this ticket");
-            }
-        }
-
-        // AGENT → can delete only assigned tickets
-        else if (role.equals("ROLE_AGENT")) {
-
-            if (ticket.getAssignedTo() == null ||
-                    !ticket.getAssignedTo().getId().equals(userId)) {
-
-                throw new AccessDeniedException("You cannot delete this ticket");
-            }
-        }
-
-        else {
-            throw new AccessDeniedException("Access denied");
-        }
+        Authentication authentication = getCurrentAuthentication();
+        Long actorId = getCurrentUserId(authentication);
+        assertCanActOnTicket(
+                ticket,
+                actorId,
+                getCurrentRole(authentication),
+                ACTION_DELETE
+        );
 
         ticketRepository.delete(ticket);
     }
 
     public Ticket updateTicketStatus(Long id, StatusUpdateRequest request) {
+        Authentication authentication = getCurrentAuthentication();
+        Long actorId = getCurrentUserId(authentication);
+        String role = getCurrentRole(authentication);
+        assertCanChangeStatus(role);
 
         Ticket ticket = ticketRepository.findById(id)
                 .orElseThrow(() -> new TicketNotFoundException(id));
 
+        assertCanActOnTicket(ticket, actorId, role, ACTION_UPDATE);
+
         Status currentStatus = ticket.getStatus();
         Status newStatus = request.getStatus();
 
+        if (newStatus == null) {
+            throw new InvalidTicketStatusException("Status is required");
+        }
+
+        if (currentStatus == null) {
+            if (newStatus != Status.OPEN && newStatus != Status.IN_PROGRESS) {
+                throw new InvalidTicketStatusException("New ticket can only start as OPEN or IN_PROGRESS");
+            }
+        }
+
         if (currentStatus == Status.OPEN && newStatus != Status.IN_PROGRESS) {
-            throw new InvalidTicketStatusException(
-                    "OPEN ticket can only move to IN_PROGRESS"
-            );
+            throw new InvalidTicketStatusException("OPEN ticket can only move to IN_PROGRESS");
         }
 
         if (currentStatus == Status.IN_PROGRESS && newStatus != Status.RESOLVED) {
-            throw new InvalidTicketStatusException(
-                    "OPEN ticket can only move to IN_PROGRESS"
-            );
+            throw new InvalidTicketStatusException("IN_PROGRESS ticket can only move to RESOLVED");
         }
 
         if (currentStatus == Status.RESOLVED && newStatus != Status.CLOSED) {
-            throw new InvalidTicketStatusException(
-                    "OPEN ticket can only move to IN_PROGRESS"
-            );
+            throw new InvalidTicketStatusException("RESOLVED ticket can only move to CLOSED");
         }
 
         if (currentStatus == Status.CLOSED) {
-            throw new InvalidTicketStatusException(
-                    "OPEN ticket can only move to IN_PROGRESS"
-            );
+            throw new InvalidTicketStatusException("CLOSED ticket cannot be changed");
         }
 
+        Status previousStatus = ticket.getStatus();
         ticket.setStatus(newStatus);
 
-        return ticketRepository.save(ticket);
+        Ticket savedTicket = ticketRepository.save(ticket);
+        auditLogService.log("STATUS_CHANGE", "ticket", savedTicket.getId(), actorId, previousStatus, newStatus);
+
+        if (savedTicket.getCreatedBy() != null) {
+            notificationService.sendTicketStatusNotification(savedTicket, savedTicket.getCreatedBy(), currentStatus != null ? currentStatus.name() : "UNKNOWN", savedTicket.getStatus().name());
+        }
+
+        return savedTicket;
     }
 
     public TicketResponse toResponse(Ticket ticket) {
@@ -299,6 +239,9 @@ public class TicketService {
     }
 
     public Ticket assignTicket(Long ticketId, AssignTicketRequest request) {
+        Authentication authentication = getCurrentAuthentication();
+        Long actorId = getCurrentUserId(authentication);
+        assertCanAssign(getCurrentRole(authentication));
 
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new TicketNotFoundException(ticketId));
@@ -313,91 +256,226 @@ public class TicketService {
             );
         }
 
+        User previousAgent = ticket.getAssignedTo();
         ticket.setAssignedTo(agent);
 
-        return ticketRepository.save(ticket);
+        Ticket savedTicket = ticketRepository.save(ticket);
+        auditLogService.log("ASSIGN", "ticket", savedTicket.getId(), actorId, previousAgent, agent);
+        notificationService.sendTicketAssignmentNotification(savedTicket, agent);
+        return savedTicket;
     }
 
     public Page<Ticket> getFilteredTickets(
             Status status,
             Priority priority,
+            String search,
             Pageable pageable) {
+        Authentication authentication = getCurrentAuthentication();
+        Long userId = getCurrentUserId(authentication);
+        String role = getCurrentRole(authentication);
+        String normalizedSearch = normalizeSearch(search);
 
-        Authentication authentication =
-                SecurityContextHolder.getContext().getAuthentication();
-
-        Long userId = Long.valueOf(authentication.getName());
-
-        String role = authentication.getAuthorities()
-                .iterator()
-                .next()
-                .getAuthority();
-
-        // ADMIN → can see all tickets
-        if (role.equals("ROLE_ADMIN")) {
-
+        if (isAdmin(role)) {
+            if (normalizedSearch != null && status != null && priority != null) {
+                return ticketRepository.findByTitleContainingIgnoreCaseAndStatusAndPriority(normalizedSearch, status, priority, pageable);
+            }
+            if (normalizedSearch != null && status != null) {
+                return ticketRepository.findByTitleContainingIgnoreCaseAndStatus(normalizedSearch, status, pageable);
+            }
+            if (normalizedSearch != null && priority != null) {
+                return ticketRepository.findByTitleContainingIgnoreCaseAndPriority(normalizedSearch, priority, pageable);
+            }
+            if (normalizedSearch != null) {
+                return ticketRepository.findByTitleContainingIgnoreCase(normalizedSearch, pageable);
+            }
             if (status != null && priority != null) {
-                return ticketRepository.findByStatusAndPriority(
-                        status, priority, pageable);
+                return ticketRepository.findByStatusAndPriority(status, priority, pageable);
             }
-
             if (status != null) {
-                return ticketRepository.findByStatus(
-                        status, pageable);
+                return ticketRepository.findByStatus(status, pageable);
             }
-
             if (priority != null) {
-                return ticketRepository.findByPriority(
-                        priority, pageable);
+                return ticketRepository.findByPriority(priority, pageable);
             }
-
             return ticketRepository.findAll(pageable);
         }
 
-        // CUSTOMER → only their own tickets
-        if (role.equals("ROLE_CUSTOMER")) {
-
+        if (isCustomer(role)) {
+            if (normalizedSearch != null && status != null && priority != null) {
+                return ticketRepository.findByCreatedByIdAndTitleContainingIgnoreCaseAndStatusAndPriority(userId, normalizedSearch, status, priority, pageable);
+            }
+            if (normalizedSearch != null && status != null) {
+                return ticketRepository.findByCreatedByIdAndTitleContainingIgnoreCaseAndStatus(userId, normalizedSearch, status, pageable);
+            }
+            if (normalizedSearch != null && priority != null) {
+                return ticketRepository.findByCreatedByIdAndTitleContainingIgnoreCaseAndPriority(userId, normalizedSearch, priority, pageable);
+            }
+            if (normalizedSearch != null) {
+                return ticketRepository.findByCreatedByIdAndTitleContainingIgnoreCase(userId, normalizedSearch, pageable);
+            }
             if (status != null && priority != null) {
-                return ticketRepository.findByCreatedByIdAndStatusAndPriority(
-                        userId, status, priority, pageable);
+                return ticketRepository.findByCreatedByIdAndStatusAndPriority(userId, status, priority, pageable);
             }
-
             if (status != null) {
-                return ticketRepository.findByCreatedByIdAndStatus(
-                        userId, status, pageable);
+                return ticketRepository.findByCreatedByIdAndStatus(userId, status, pageable);
             }
-
             if (priority != null) {
-                return ticketRepository.findByCreatedByIdAndPriority(
-                        userId, priority, pageable);
+                return ticketRepository.findByCreatedByIdAndPriority(userId, priority, pageable);
             }
-
-            return ticketRepository.findByCreatedById(
-                    userId, pageable);
+            return ticketRepository.findByCreatedById(userId, pageable);
         }
 
-        // AGENT → only tickets assigned to them
-        if (role.equals("ROLE_AGENT")) {
-
+        if (isAgent(role)) {
+            if (normalizedSearch != null && status != null && priority != null) {
+                return ticketRepository.findByAssignedToIdAndTitleContainingIgnoreCaseAndStatusAndPriority(userId, normalizedSearch, status, priority, pageable);
+            }
+            if (normalizedSearch != null && status != null) {
+                return ticketRepository.findByAssignedToIdAndTitleContainingIgnoreCaseAndStatus(userId, normalizedSearch, status, pageable);
+            }
+            if (normalizedSearch != null && priority != null) {
+                return ticketRepository.findByAssignedToIdAndTitleContainingIgnoreCaseAndPriority(userId, normalizedSearch, priority, pageable);
+            }
+            if (normalizedSearch != null) {
+                return ticketRepository.findByAssignedToIdAndTitleContainingIgnoreCase(userId, normalizedSearch, pageable);
+            }
             if (status != null && priority != null) {
-                return ticketRepository.findByAssignedToIdAndStatusAndPriority(
-                        userId, status, priority, pageable);
+                return ticketRepository.findByAssignedToIdAndStatusAndPriority(userId, status, priority, pageable);
             }
-
             if (status != null) {
-                return ticketRepository.findByAssignedToIdAndStatus(
-                        userId, status, pageable);
+                return ticketRepository.findByAssignedToIdAndStatus(userId, status, pageable);
             }
-
             if (priority != null) {
-                return ticketRepository.findByAssignedToIdAndPriority(
-                        userId, priority, pageable);
+                return ticketRepository.findByAssignedToIdAndPriority(userId, priority, pageable);
             }
-
-            return ticketRepository.findByAssignedToId(
-                    userId, pageable);
+            return ticketRepository.findByAssignedToId(userId, pageable);
         }
 
-        return Page.empty(pageable);
+        throw new AccessDeniedException(MESSAGE_ACCESS_DENIED);
+    }
+
+    public TicketSummaryResponse getTicketSummary() {
+        String role = getCurrentRole(getCurrentAuthentication());
+        if (!isAdmin(role)) {
+            throw new AccessDeniedException("Only admins can view ticket summary");
+        }
+
+        List<Ticket> tickets = ticketRepository.findAll();
+        TicketSummaryResponse summary = new TicketSummaryResponse();
+
+        for (Ticket ticket : tickets) {
+            summary.addStatusCount(ticket.getStatus());
+            summary.addPriorityCount(ticket.getPriority());
+        }
+
+        return summary;
+    }
+
+    public List<AgentWorkloadResponse> getAgentWorkload() {
+        String role = getCurrentRole(getCurrentAuthentication());
+        if (!isAdmin(role)) {
+            throw new AccessDeniedException("Only admins can view agent workload");
+        }
+
+        return userRepository.findAll().stream()
+                .filter(user -> user.getRole() == com.example.helpdesk_backend.enums.Role.AGENT)
+                .map(user -> {
+                    AgentWorkloadResponse response = new AgentWorkloadResponse();
+                    response.setAgentId(user.getId());
+                    response.setAgentName(user.getName());
+                    response.setAssignedTickets(ticketRepository.findByAssignedToId(user.getId()).size());
+                    return response;
+                })
+                .sorted(Comparator.comparingLong(AgentWorkloadResponse::getAssignedTickets).reversed())
+                .toList();
+    }
+
+    private String normalizeSearch(String search) {
+        if (search == null || search.isBlank()) {
+            return null;
+        }
+        String trimmed = search.trim();
+        return trimmed.length() < 3 ? null : trimmed;
+    }
+
+    private Authentication getCurrentAuthentication() {
+        Authentication authentication = SecurityContextHolder
+                .getContext()
+                .getAuthentication();
+
+        if (authentication == null) {
+            throw new AccessDeniedException(MESSAGE_ACCESS_DENIED);
+        }
+
+        return authentication;
+    }
+
+    private Long getCurrentUserId(Authentication authentication) {
+        try {
+            return Long.valueOf(authentication.getName());
+        } catch (NumberFormatException exception) {
+            throw new AccessDeniedException(MESSAGE_ACCESS_DENIED);
+        }
+    }
+
+    private String getCurrentRole(Authentication authentication) {
+        return authentication.getAuthorities()
+                .stream()
+                .findFirst()
+                .map(grantedAuthority -> grantedAuthority.getAuthority())
+                .orElseThrow(() -> new AccessDeniedException(MESSAGE_ACCESS_DENIED));
+    }
+
+    private boolean isAdmin(String role) {
+        return ROLE_ADMIN.equals(role);
+    }
+
+    private boolean isCustomer(String role) {
+        return ROLE_CUSTOMER.equals(role);
+    }
+
+    private boolean isAgent(String role) {
+        return ROLE_AGENT.equals(role);
+    }
+
+    private void assertCanAssign(String role) {
+        if (!isAdmin(role)) {
+            throw new AccessDeniedException("You cannot assign this ticket");
+        }
+    }
+
+    private void assertCanChangeStatus(String role) {
+        if (!isAdmin(role) && !isAgent(role)) {
+            throw new AccessDeniedException("You cannot update this ticket status");
+        }
+    }
+
+    private void assertCanActOnTicket(
+            Ticket ticket,
+            Long userId,
+            String role,
+            String action) {
+
+        if (isAdmin(role)) {
+            return;
+        }
+
+        if (isCustomer(role)) {
+            if (ticket.getCreatedBy().getId().equals(userId)) {
+                return;
+            }
+            throw new AccessDeniedException(
+                    String.format("You cannot %s this ticket", action));
+        }
+
+        if (isAgent(role)) {
+            if (ticket.getAssignedTo() != null
+                    && ticket.getAssignedTo().getId().equals(userId)) {
+                return;
+            }
+            throw new AccessDeniedException(
+                    String.format("You cannot %s this ticket", action));
+        }
+
+        throw new AccessDeniedException(MESSAGE_ACCESS_DENIED);
     }
 }

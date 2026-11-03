@@ -1,18 +1,20 @@
 package com.example.helpdesk_backend.controller;
 
-import com.example.helpdesk_backend.dto.*;
+import com.example.helpdesk_backend.dto.AgentWorkloadResponse;
+import com.example.helpdesk_backend.dto.AssignTicketRequest;
+import com.example.helpdesk_backend.dto.StatusUpdateRequest;
+import com.example.helpdesk_backend.dto.TicketRequest;
+import com.example.helpdesk_backend.dto.TicketResponse;
+import com.example.helpdesk_backend.dto.TicketSummaryResponse;
+import com.example.helpdesk_backend.dto.TicketUpdateRequest;
 import com.example.helpdesk_backend.entity.Ticket;
-import com.example.helpdesk_backend.service.TicketService;
-import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import com.example.helpdesk_backend.enums.Priority;
 import com.example.helpdesk_backend.enums.Status;
-import org.springframework.web.bind.annotation.RequestParam;
+import com.example.helpdesk_backend.service.TicketService;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import com.example.helpdesk_backend.entity.Ticket;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -38,10 +40,11 @@ public class TicketController {
     public Page<TicketResponse> getTickets(
             @RequestParam(required = false) Status status,
             @RequestParam(required = false) Priority priority,
+            @RequestParam(required = false) String search,
             Pageable pageable) {
 
         return ticketService
-                .getFilteredTickets(status, priority, pageable)
+                .getFilteredTickets(status, priority, search, pageable)
                 .map(ticket -> ticketService.toResponse(ticket));
     }
 
@@ -77,10 +80,20 @@ public class TicketController {
         ticketService.deleteTicket(id);
     }
 
+    @GetMapping("/summary")
+    public TicketSummaryResponse getTicketSummary() {
+        return ticketService.getTicketSummary();
+    }
+
+    @GetMapping("/agent-workload")
+    public List<AgentWorkloadResponse> getAgentWorkload() {
+        return ticketService.getAgentWorkload();
+    }
+
     @PutMapping("/{id}/status")
     public TicketResponse updateTicketStatus(
             @PathVariable Long id,
-            @RequestBody StatusUpdateRequest request) {
+            @Valid @RequestBody StatusUpdateRequest request) {
 
         Ticket ticket = ticketService.updateTicketStatus(id, request);
 
@@ -90,7 +103,7 @@ public class TicketController {
     @PutMapping("/{id}/assign")
     public TicketResponse assignTicket(
             @PathVariable Long id,
-            @RequestBody AssignTicketRequest request) {
+            @Valid @RequestBody AssignTicketRequest request) {
 
         Ticket ticket = ticketService.assignTicket(id, request);
 

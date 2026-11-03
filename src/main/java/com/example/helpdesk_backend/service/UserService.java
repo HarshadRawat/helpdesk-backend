@@ -9,6 +9,7 @@ import com.example.helpdesk_backend.exception.UserNotFoundException;
 import com.example.helpdesk_backend.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -35,23 +36,44 @@ public class UserService {
                 .orElseThrow(() -> new UserNotFoundException(id));
     }
 
+    @Transactional
     public User createUser(UserRequest request) {
 
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new EmailAlreadyExistsException(request.getEmail());
         }
 
+        Role role = request.getRole() == null ? Role.CUSTOMER : request.getRole();
+
         User user = new User();
 
         user.setName(request.getName());
         user.setEmail(request.getEmail());
-        user.setPassword(
-                passwordEncoder.encode(request.getPassword())
-        );
-
-        user.setRole(Role.CUSTOMER);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setRole(role);
 
         return userRepository.save(user);
+    }
+
+    @Transactional
+    public User updateUserRole(Long id, Role role) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(id));
+
+        if (role == null) {
+            throw new IllegalArgumentException("Role is required");
+        }
+
+        user.setRole(role);
+        return userRepository.save(user);
+    }
+
+    @Transactional
+    public void deleteUser(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(id));
+
+        userRepository.delete(user);
     }
 
     public UserResponse toResponse(User user) {

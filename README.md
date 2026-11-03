@@ -49,17 +49,103 @@ The ticket can then be assigned to an agent and progresses through different sta
 
 | Technology | Purpose |
 |------------|---------|
-| Java | Backend programming |
-| Spring Boot | Backend framework |
-| Spring Web | REST API development |
+| Java 17 | Backend runtime |
+| Spring Boot 4 | Backend framework |
+| Spring Web MVC | REST API development |
 | Spring Data JPA | Database access |
 | Hibernate | ORM |
 | Spring Security | Authentication and authorization |
 | JWT | Token-based authentication |
 | MySQL | Relational database |
+| Flyway | Database migrations |
+| Actuator | Health and operational monitoring |
+| Micrometer + Prometheus | Metrics |
+| JavaMail | Email notifications |
 | Maven | Dependency management |
+| Docker | Containerization |
 | Postman | API testing |
 | IntelliJ IDEA | Development |
+
+---
+
+## 🚀 Production-ready setup
+
+### Production security basics
+
+Before deploying to a real environment, place secrets outside the repository:
+
+- DB credentials
+- JWT secret
+- SMTP credentials
+- any production certificates or keys
+
+Recommended approaches:
+
+- environment variables
+- Docker secrets / Kubernetes secrets
+- AWS Secrets Manager / Azure Key Vault / HashiCorp Vault
+
+Example:
+
+```bash
+export DB_URL=jdbc:mysql://prod-db:3306/helpdesk_db
+export DB_USERNAME=helpdesk_app
+export DB_PASSWORD=your_secure_password
+export JWT_SECRET=your_long_secure_secret_key_32_chars_plus
+
+export SPRING_PROFILES_ACTIVE=prod
+```
+
+### API documentation
+
+The backend exposes Swagger UI and OpenAPI docs once the app is running:
+
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+
+This helps with API contract visibility, testing, and frontend/backend integration in a production environment.
+
+### Docker deployment validation
+
+The repository includes a Docker Compose stack for the app, MySQL, and Nginx. The compose file is valid for local deployment validation, but Docker itself must be running on the host before starting the stack.
+
+A default bootstrap admin can be created automatically when the app starts. It should only be enabled for local/dev setup; keep it off in production.
+
+```bash
+export APP_BOOTSTRAP_ADMIN_ENABLED=false
+export APP_BOOTSTRAP_ADMIN_NAME=Admin
+export APP_BOOTSTRAP_ADMIN_EMAIL=admin@localhost
+export APP_BOOTSTRAP_ADMIN_PASSWORD=change-me-admin-password
+```
+
+Use environment variables instead of hardcoded secrets and demo config:
+
+```bash
+export DB_URL=jdbc:mysql://localhost:3306/helpdesk_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+export DB_USERNAME=root
+export DB_PASSWORD=your_secure_db_password
+export JWT_SECRET=your_long_secure_secret_key
+export SERVER_PORT=8080
+export SPRING_PROFILES_ACTIVE=prod
+```
+
+Development profile:
+
+```bash
+export SPRING_PROFILES_ACTIVE=dev
+```
+
+Health checks:
+
+```bash
+curl http://localhost:8080/actuator/health
+```
+
+Docker compose:
+
+```bash
+docker compose up --build
+```
 
 ---
 

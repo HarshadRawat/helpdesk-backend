@@ -1,5 +1,6 @@
 package com.example.helpdesk_backend.dto;
 
+import com.example.helpdesk_backend.enums.Role;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -16,6 +17,8 @@ public class UserRequest {
     @NotBlank
     @Size(min = 8)
     private String password;
+
+    private Role role;
 
     public String getName() {
         return name;
@@ -39,5 +42,13 @@ public class UserRequest {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
     }
 }
