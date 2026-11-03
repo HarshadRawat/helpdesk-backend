@@ -31,6 +31,7 @@ jobs:
         run: |
           export SPRING_PROFILES_ACTIVE=test
           export SERVER_PORT=8082
+          export MANAGEMENT_PORT=8082
           bash ./mvnw spring-boot:run > app.log 2>&1 &
           APP_PID=$!
 
