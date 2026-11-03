@@ -22,16 +22,16 @@ jobs:
           cache: maven
 
       - name: Run tests
-        run: ./mvnw test
+        run: bash ./mvnw test
 
       - name: Build project
-        run: ./mvnw clean package -DskipTests
+        run: bash ./mvnw clean package -DskipTests
 
       - name: Smoke test startup and health endpoint
         run: |
           export SPRING_PROFILES_ACTIVE=test
           export SERVER_PORT=8082
-          ./mvnw spring-boot:run > app.log 2>&1 &
+          bash ./mvnw spring-boot:run > app.log 2>&1 &
           APP_PID=$!
 
           for i in $(seq 1 60); do
