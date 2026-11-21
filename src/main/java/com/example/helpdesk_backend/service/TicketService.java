@@ -6,18 +6,25 @@ import com.example.helpdesk_backend.entity.User;
 import com.example.helpdesk_backend.enums.Priority;
 import com.example.helpdesk_backend.enums.Role;
 import com.example.helpdesk_backend.enums.Status;
+import com.example.helpdesk_backend.event.TicketAssignedEvent;
+import com.example.helpdesk_backend.event.TicketStatusChangedEvent;
 import com.example.helpdesk_backend.exception.InvalidTicketAssignmentException;
 import com.example.helpdesk_backend.exception.InvalidTicketStatusException;
 import com.example.helpdesk_backend.exception.TicketNotFoundException;
 import com.example.helpdesk_backend.exception.UserNotFoundException;
 import com.example.helpdesk_backend.repository.TicketRepository;
 import com.example.helpdesk_backend.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -39,18 +46,18 @@ public class TicketService {
 
     private final TicketRepository ticketRepository;
     private final UserRepository userRepository;
-    private final NotificationService notificationService;
+    private final ApplicationEventPublisher eventPublisher;
     private final AuditLogService auditLogService;
 
     public TicketService(
             TicketRepository ticketRepository,
             UserRepository userRepository,
-            NotificationService notificationService,
+            ApplicationEventPublisher eventPublisher,
             AuditLogService auditLogService) {
 
         this.ticketRepository = ticketRepository;
         this.userRepository = userRepository;
-        this.notificationService = notificationService;
+        this.eventPublisher = eventPublisher;
         this.auditLogService = auditLogService;
     }
 
@@ -81,6 +88,7 @@ public class TicketService {
         return ticketRepository.findAll(pageable);
     }
 
+    @Transactional
     public Ticket createTicket(TicketRequest request) {
         Long userId = getCurrentUserId(getCurrentAuthentication());
 
@@ -93,8 +101,9 @@ public class TicketService {
         ticket.setDescription(request.getDescription());
         ticket.setPriority(request.getPriority());
         ticket.setStatus(Status.OPEN);
-
         ticket.setCreatedBy(user);
+        ticket.setSlaDueAt(calculateSlaDueAt(request.getPriority()));
+        ticket.setSlaBreached(false);
 
         Ticket savedTicket = ticketRepository.save(ticket);
         auditLogService.log("CREATE", "ticket", savedTicket.getId(), userId, null, savedTicket);
@@ -116,6 +125,7 @@ public class TicketService {
         return ticket;
     }
 
+    @Transactional
     public Ticket updateTicket(Long id, TicketUpdateRequest request) {
 
         Ticket ticket = ticketRepository.findById(id)
@@ -140,13 +150,19 @@ public class TicketService {
 
         ticket.setTitle(request.getTitle());
         ticket.setDescription(request.getDescription());
-        ticket.setPriority(request.getPriority());
+        if (request.getPriority() != null && request.getPriority() != ticket.getPriority()) {
+            ticket.setPriority(request.getPriority());
+            if (ticket.getStatus() == Status.OPEN || ticket.getStatus() == Status.IN_PROGRESS) {
+                ticket.setSlaDueAt(calculateSlaDueAt(request.getPriority()));
+            }
+        }
 
         Ticket savedTicket = ticketRepository.save(ticket);
         auditLogService.log("UPDATE", "ticket", savedTicket.getId(), actorId, snapshot, savedTicket);
         return savedTicket;
     }
 
+    @Transactional
     public void deleteTicket(Long id) {
 
         Ticket ticket = ticketRepository.findById(id)
@@ -164,6 +180,7 @@ public class TicketService {
         ticketRepository.delete(ticket);
     }
 
+    @Transactional
     public Ticket updateTicketStatus(Long id, StatusUpdateRequest request) {
         Authentication authentication = getCurrentAuthentication();
         Long actorId = getCurrentUserId(authentication);
@@ -211,7 +228,12 @@ public class TicketService {
         auditLogService.log("STATUS_CHANGE", "ticket", savedTicket.getId(), actorId, previousStatus, newStatus);
 
         if (savedTicket.getCreatedBy() != null) {
-            notificationService.sendTicketStatusNotification(savedTicket, savedTicket.getCreatedBy(), currentStatus != null ? currentStatus.name() : "UNKNOWN", savedTicket.getStatus().name());
+            eventPublisher.publishEvent(new TicketStatusChangedEvent(
+                    savedTicket,
+                    savedTicket.getCreatedBy(),
+                    currentStatus != null ? currentStatus.name() : "UNKNOWN",
+                    savedTicket.getStatus().name()
+            ));
         }
 
         return savedTicket;
@@ -235,9 +257,14 @@ public class TicketService {
             response.setAssignedToName(ticket.getAssignedTo().getName());
         }
 
+        response.setVersion(ticket.getVersion());
+        response.setSlaDueAt(ticket.getSlaDueAt());
+        response.setSlaBreached(ticket.isSlaBreached());
+
         return response;
     }
 
+    @Transactional
     public Ticket assignTicket(Long ticketId, AssignTicketRequest request) {
         Authentication authentication = getCurrentAuthentication();
         Long actorId = getCurrentUserId(authentication);
@@ -261,7 +288,7 @@ public class TicketService {
 
         Ticket savedTicket = ticketRepository.save(ticket);
         auditLogService.log("ASSIGN", "ticket", savedTicket.getId(), actorId, previousAgent, agent);
-        notificationService.sendTicketAssignmentNotification(savedTicket, agent);
+        eventPublisher.publishEvent(new TicketAssignedEvent(savedTicket, agent));
         return savedTicket;
     }
 
@@ -477,5 +504,16 @@ public class TicketService {
         }
 
         throw new AccessDeniedException(MESSAGE_ACCESS_DENIED);
+    }
+
+    private Instant calculateSlaDueAt(Priority priority) {
+        if (priority == null) {
+            return Instant.now().plus(Duration.ofHours(24));
+        }
+        return switch (priority) {
+            case HIGH -> Instant.now().plus(Duration.ofHours(4));
+            case MEDIUM -> Instant.now().plus(Duration.ofHours(24));
+            case LOW -> Instant.now().plus(Duration.ofHours(72));
+        };
     }
 }

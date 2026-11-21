@@ -3,6 +3,8 @@ package com.example.helpdesk_backend.dto;
 import com.example.helpdesk_backend.enums.Priority;
 import com.example.helpdesk_backend.enums.Status;
 
+import java.time.Instant;
+
 public class TicketResponse {
 
     private Long id;
@@ -16,6 +18,10 @@ public class TicketResponse {
 
     private Long assignedToId;
     private String assignedToName;
+
+    private Long version;
+    private Instant slaDueAt;
+    private boolean slaBreached;
 
     public Long getId() {
         return id;
@@ -87,5 +93,29 @@ public class TicketResponse {
 
     public void setAssignedToName(String assignedToName) {
         this.assignedToName = assignedToName;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
+    }
+
+    public Instant getSlaDueAt() {
+        return slaDueAt;
+    }
+
+    public void setSlaDueAt(Instant slaDueAt) {
+        this.slaDueAt = slaDueAt;
+    }
+
+    public boolean isSlaBreached() {
+        return slaBreached;
+    }
+
+    public void setSlaBreached(boolean slaBreached) {
+        this.slaBreached = slaBreached;
     }
 }

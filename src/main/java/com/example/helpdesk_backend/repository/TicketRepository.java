@@ -6,7 +6,10 @@ import com.example.helpdesk_backend.enums.Status;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
@@ -147,5 +150,11 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
             Status status,
             Priority priority,
             Pageable pageable
+    );
+
+    @Query("SELECT t FROM Ticket t WHERE t.slaDueAt < :now AND t.slaBreached = false AND t.status NOT IN :excludedStatuses")
+    List<Ticket> findBreachedTickets(
+            @Param("now") Instant now,
+            @Param("excludedStatuses") List<Status> excludedStatuses
     );
 }

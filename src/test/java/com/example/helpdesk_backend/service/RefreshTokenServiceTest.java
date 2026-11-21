@@ -114,6 +114,29 @@ class RefreshTokenServiceTest {
     }
 
     @Test
+    void rotateShouldRejectTokenThatExpiresAtCurrentTime() {
+        User user = user(8L);
+        String edgeToken = "edge-refresh-token";
+        String tokenId = "edge-jti";
+        Instant now = Instant.now();
+
+        RefreshToken stored = new RefreshToken(
+                tokenId,
+                hash(edgeToken),
+                user,
+                now
+        );
+
+        when(jwtService.isRefreshToken(edgeToken)).thenReturn(true);
+        when(jwtService.extractUserId(edgeToken)).thenReturn("8");
+        when(jwtService.extractTokenId(edgeToken)).thenReturn(tokenId);
+        when(refreshTokenRepository.findByTokenId(tokenId)).thenReturn(Optional.of(stored));
+
+        assertThrows(InvalidLoginException.class, () -> refreshTokenService.rotate(edgeToken));
+        assertNotNull(stored.getRevokedAt());
+    }
+
+    @Test
     void rotateShouldRevokeAllActiveTokensWhenReusedTokenIsDetected() {
         User user = user(7L);
         String reusedToken = "reused-token";

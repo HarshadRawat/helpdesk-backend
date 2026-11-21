@@ -1,8 +1,8 @@
-# HelpDesk Backend
+﻿# HelpDesk Backend
 
-A production-oriented Spring Boot backend for a HelpDesk and ticket management system. The application provides secure authentication, role-based access control, ticket lifecycle management, audit support, and a Docker-ready deployment setup.
+A production-oriented Spring Boot backend for a HelpDesk and ticket management system. The application provides secure authentication, role-based authorization, ticket lifecycle management, audit support, and a Docker-ready deployment setup.
 
-This project is built as a backend-only API service and is designed for real-world ticket workflows in an IT support environment.
+This project is built as a backend-only REST API and is designed for real-world support workflows in an IT operations environment.
 
 ## Overview
 
@@ -15,7 +15,7 @@ The system models a typical internal support workflow:
 - users authenticate through JWT tokens
 - the system persists data using MySQL and Flyway migrations
 
-## Features
+## Key Features
 
 - User registration and login
 - JWT-based authentication and authorization
@@ -27,9 +27,10 @@ The system models a typical internal support workflow:
 - Validation and centralized exception handling
 - BCrypt password hashing
 - Refresh-token rotation and reuse detection for secure auth flows
-- Request ID tracking and rate limiting support
-- Audit logging and admin workload reporting
+- Request tracing and rate limiting support
+- Audit logging and admin reporting
 - Docker Compose deployment support
+- CI validation for automated build and smoke testing
 
 ## Tech Stack
 
@@ -98,7 +99,6 @@ src/
 The API uses JWT-based authentication with Spring Security.
 
 Core security behavior includes:
-
 - login endpoint for generating auth tokens
 - refresh-token rotation and reuse detection
 - role-based access checks for ticket and user endpoints
@@ -131,7 +131,7 @@ The system supports a structured ticket workflow:
 OPEN → IN_PROGRESS → RESOLVED → CLOSED
 ```
 
-The business logic prevents invalid transitions and enforces ownership/assignment rules before state changes are allowed.
+The business logic prevents invalid transitions and enforces ownership and assignment rules before state changes are allowed.
 
 ## Core API Endpoints
 
@@ -291,11 +291,3 @@ This project is provided as a backend development sample and is intended for lea
 ## Contact
 
 For questions or collaboration, please reach out via the project repository or contact information linked to the repository owner.
-
----
-
-## 👨‍💻 Author
-
-**Harshad Rawat**
-
-Java | Spring Boot | Backend Development | DSA

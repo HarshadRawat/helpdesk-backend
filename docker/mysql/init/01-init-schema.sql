@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS ticket (
     status VARCHAR(50),
     created_by BIGINT,
     assigned_to BIGINT,
+    version BIGINT NOT NULL DEFAULT 0,
+    sla_due_at TIMESTAMP NULL,
+    sla_breached BOOLEAN NOT NULL DEFAULT FALSE,
     PRIMARY KEY (id),
     CONSTRAINT fk_ticket_created_by FOREIGN KEY (created_by) REFERENCES users(id),
     CONSTRAINT fk_ticket_assigned_to FOREIGN KEY (assigned_to) REFERENCES users(id)
@@ -38,6 +41,7 @@ CREATE INDEX idx_ticket_created_by ON ticket(created_by);
 CREATE INDEX idx_ticket_assigned_to ON ticket(assigned_to);
 CREATE INDEX idx_ticket_status ON ticket(status);
 CREATE INDEX idx_ticket_priority ON ticket(priority);
+CREATE INDEX idx_ticket_sla ON ticket(sla_breached, sla_due_at, status);
 CREATE INDEX idx_comment_ticket_id ON comment(ticket_id);
 
 CREATE TABLE IF NOT EXISTS audit_log (

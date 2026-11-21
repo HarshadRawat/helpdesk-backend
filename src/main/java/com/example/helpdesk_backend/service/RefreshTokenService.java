@@ -43,7 +43,8 @@ public class RefreshTokenService {
             throw new InvalidLoginException("Refresh token reuse detected. Please login again.");
         }
 
-        if (storedToken.getExpiresAt().isBefore(Instant.now())) {
+        Instant now = Instant.now();
+        if (storedToken.getExpiresAt() == null || !storedToken.getExpiresAt().isAfter(now)) {
             revokeToken(storedToken, null);
             throw new InvalidLoginException("Refresh token expired or revoked");
         }

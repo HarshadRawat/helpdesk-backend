@@ -1,12 +1,13 @@
 package com.example.helpdesk_backend.entity;
-import com.example.helpdesk_backend.entity.User;
 
 import com.example.helpdesk_backend.enums.Priority;
 import com.example.helpdesk_backend.enums.Status;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
+
+import java.time.Instant;
 
 @Entity
+@Table(name = "ticket")
 public class Ticket {
 
     @Id
@@ -30,6 +31,16 @@ public class Ticket {
     @ManyToOne
     @JoinColumn(name = "assigned_to")
     private User assignedTo;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
+
+    @Column(name = "sla_due_at")
+    private Instant slaDueAt;
+
+    @Column(name = "sla_breached", nullable = false)
+    private boolean slaBreached = false;
 
     public Ticket() {
     }
@@ -62,11 +73,11 @@ public class Ticket {
         return priority;
     }
 
-    public void setPriority(Priority  priority) {
+    public void setPriority(Priority priority) {
         this.priority = priority;
     }
 
-    public Status  getStatus() {
+    public Status getStatus() {
         return status;
     }
 
@@ -88,5 +99,29 @@ public class Ticket {
 
     public void setAssignedTo(User assignedTo) {
         this.assignedTo = assignedTo;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
+    }
+
+    public Instant getSlaDueAt() {
+        return slaDueAt;
+    }
+
+    public void setSlaDueAt(Instant slaDueAt) {
+        this.slaDueAt = slaDueAt;
+    }
+
+    public boolean isSlaBreached() {
+        return slaBreached;
+    }
+
+    public void setSlaBreached(boolean slaBreached) {
+        this.slaBreached = slaBreached;
     }
 }
