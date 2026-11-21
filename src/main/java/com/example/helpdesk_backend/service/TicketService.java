@@ -14,6 +14,8 @@ import com.example.helpdesk_backend.exception.TicketNotFoundException;
 import com.example.helpdesk_backend.exception.UserNotFoundException;
 import com.example.helpdesk_backend.repository.TicketRepository;
 import com.example.helpdesk_backend.repository.UserRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -89,6 +91,7 @@ public class TicketService {
     }
 
     @Transactional
+    @CacheEvict(value = {"ticketSummary", "agentWorkload"}, allEntries = true)
     public Ticket createTicket(TicketRequest request) {
         Long userId = getCurrentUserId(getCurrentAuthentication());
 
@@ -126,6 +129,7 @@ public class TicketService {
     }
 
     @Transactional
+    @CacheEvict(value = {"ticketSummary", "agentWorkload"}, allEntries = true)
     public Ticket updateTicket(Long id, TicketUpdateRequest request) {
 
         Ticket ticket = ticketRepository.findById(id)
@@ -163,6 +167,7 @@ public class TicketService {
     }
 
     @Transactional
+    @CacheEvict(value = {"ticketSummary", "agentWorkload"}, allEntries = true)
     public void deleteTicket(Long id) {
 
         Ticket ticket = ticketRepository.findById(id)
@@ -181,6 +186,7 @@ public class TicketService {
     }
 
     @Transactional
+    @CacheEvict(value = {"ticketSummary", "agentWorkload"}, allEntries = true)
     public Ticket updateTicketStatus(Long id, StatusUpdateRequest request) {
         Authentication authentication = getCurrentAuthentication();
         Long actorId = getCurrentUserId(authentication);
@@ -265,6 +271,7 @@ public class TicketService {
     }
 
     @Transactional
+    @CacheEvict(value = {"ticketSummary", "agentWorkload"}, allEntries = true)
     public Ticket assignTicket(Long ticketId, AssignTicketRequest request) {
         Authentication authentication = getCurrentAuthentication();
         Long actorId = getCurrentUserId(authentication);
@@ -380,6 +387,7 @@ public class TicketService {
         throw new AccessDeniedException(MESSAGE_ACCESS_DENIED);
     }
 
+    @Cacheable(value = "ticketSummary")
     public TicketSummaryResponse getTicketSummary() {
         String role = getCurrentRole(getCurrentAuthentication());
         if (!isAdmin(role)) {
@@ -397,6 +405,7 @@ public class TicketService {
         return summary;
     }
 
+    @Cacheable(value = "agentWorkload")
     public List<AgentWorkloadResponse> getAgentWorkload() {
         String role = getCurrentRole(getCurrentAuthentication());
         if (!isAdmin(role)) {

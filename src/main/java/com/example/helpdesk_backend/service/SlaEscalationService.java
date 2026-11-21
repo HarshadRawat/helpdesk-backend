@@ -5,6 +5,7 @@ import com.example.helpdesk_backend.enums.Status;
 import com.example.helpdesk_backend.repository.TicketRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ public class SlaEscalationService {
 
     @Scheduled(cron = "${app.sla.check-cron:0 */15 * * * *}")
     @Transactional
+    @CacheEvict(value = {"ticketSummary", "agentWorkload"}, allEntries = true)
     public int checkAndEscalateBreachedTickets() {
         Instant now = Instant.now();
         List<Ticket> breachedTickets = ticketRepository.findBreachedTickets(
