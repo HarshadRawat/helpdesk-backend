@@ -47,6 +47,20 @@ public class NotificationService {
         sendEmail(agent.getEmail(), subject, message);
     }
 
+    public void sendPasswordResetNotification(User user, String resetToken) {
+        if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+            return;
+        }
+
+        String subject = "HelpDesk - Password Reset Request";
+        String message = "Hello " + user.getName() + ",\n\n"
+                + "A password reset request was received for your account.\n"
+                + "Your reset token is: " + resetToken + "\n\n"
+                + "This token will expire in 15 minutes. If you did not request this, please ignore this email.";
+
+        sendEmail(user.getEmail(), subject, message);
+    }
+
     private void sendEmail(String to, String subject, String message) {
         try {
             SimpleMailMessage mail = new SimpleMailMessage();
