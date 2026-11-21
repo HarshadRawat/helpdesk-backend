@@ -1,0 +1,237 @@
+package com.example.helpdesk_backend.integration;
+
+import com.example.helpdesk_backend.dto.AssignTicketRequest;
+import com.example.helpdesk_backend.dto.CommentRequest;
+import com.example.helpdesk_backend.dto.StatusUpdateRequest;
+import com.example.helpdesk_backend.dto.TicketRequest;
+import com.example.helpdesk_backend.dto.TicketResponse;
+import com.example.helpdesk_backend.dto.TicketUpdateRequest;
+import com.example.helpdesk_backend.entity.User;
+import com.example.helpdesk_backend.enums.Priority;
+import com.example.helpdesk_backend.enums.Role;
+import com.example.helpdesk_backend.enums.Status;
+import com.example.helpdesk_backend.repository.CommentRepository;
+import com.example.helpdesk_backend.repository.TicketRepository;
+import com.example.helpdesk_backend.repository.UserRepository;
+import com.example.helpdesk_backend.security.JwtService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+class TicketSecurityIntegrationTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private TicketRepository ticketRepository;
+
+    @Autowired
+    private CommentRepository commentRepository;
+
+    @Autowired
+    private com.example.helpdesk_backend.repository.TicketAttachmentRepository attachmentRepository;
+
+    @Autowired
+    private com.example.helpdesk_backend.repository.RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
+    private com.example.helpdesk_backend.repository.PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @Autowired
+    private JwtService jwtService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    private User admin;
+    private User customerA;
+    private User customerB;
+    private User agent;
+
+    private String adminToken;
+    private String customerAToken;
+    private String customerBToken;
+    private String agentToken;
+
+    @BeforeEach
+    void setUpData() {
+        attachmentRepository.deleteAll();
+        commentRepository.deleteAll();
+        ticketRepository.deleteAll();
+        refreshTokenRepository.deleteAll();
+        passwordResetTokenRepository.deleteAll();
+        userRepository.deleteAll();
+
+        admin = createUser("Admin", "admin@domain.com", Role.ADMIN);
+        customerA = createUser("Customer A", "customerA@domain.com", Role.CUSTOMER);
+        customerB = createUser("Customer B", "customerB@domain.com", Role.CUSTOMER);
+        agent = createUser("Support Agent", "agent@domain.com", Role.AGENT);
+
+        adminToken = "Bearer " + jwtService.generateAccessToken(admin);
+        customerAToken = "Bearer " + jwtService.generateAccessToken(customerA);
+        customerBToken = "Bearer " + jwtService.generateAccessToken(customerB);
+        agentToken = "Bearer " + jwtService.generateAccessToken(agent);
+    }
+
+    private User createUser(String name, String email, Role role) {
+        User user = new User();
+        user.setName(name);
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode("Password123!"));
+        user.setRole(role);
+        return userRepository.save(user);
+    }
+
+    @Test
+    void testCustomerCannotAccessOtherCustomerTicket() throws Exception {
+        TicketRequest ticketReq = new TicketRequest();
+        ticketReq.setTitle("Printer issue");
+        ticketReq.setDescription("Cannot print documents");
+        ticketReq.setPriority(Priority.MEDIUM);
+
+        String createRes = mockMvc.perform(post("/api/tickets")
+                        .header("Authorization", customerAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ticketReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+
+        TicketResponse createdTicket = objectMapper.readValue(createRes, TicketResponse.class);
+        Long ticketId = createdTicket.getId();
+
+        mockMvc.perform(get("/api/tickets/" + ticketId)
+                        .header("Authorization", customerAToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/tickets/" + ticketId)
+                        .header("Authorization", customerBToken))
+                .andExpect(status().isForbidden());
+
+        TicketUpdateRequest updateReq = new TicketUpdateRequest();
+        updateReq.setTitle("Malicious Title Update");
+        updateReq.setDescription("Customer B trying to update Customer A's ticket");
+        updateReq.setPriority(Priority.HIGH);
+
+        mockMvc.perform(put("/api/tickets/" + ticketId)
+                        .header("Authorization", customerBToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void testAssignmentAndStatusWorkflowWithRbac() throws Exception {
+        TicketRequest ticketReq = new TicketRequest();
+        ticketReq.setTitle("Server latency");
+        ticketReq.setDescription("Server latency is spiking");
+        ticketReq.setPriority(Priority.HIGH);
+
+        String createRes = mockMvc.perform(post("/api/tickets")
+                        .header("Authorization", customerAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ticketReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        TicketResponse createdTicket = objectMapper.readValue(createRes, TicketResponse.class);
+        Long ticketId = createdTicket.getId();
+
+        AssignTicketRequest assignReq = new AssignTicketRequest();
+        assignReq.setAgentId(agent.getId());
+
+        mockMvc.perform(put("/api/tickets/" + ticketId + "/assign")
+                        .header("Authorization", customerAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(assignReq)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/tickets/" + ticketId + "/assign")
+                        .header("Authorization", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(assignReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignedToId").value(agent.getId()));
+
+        StatusUpdateRequest invalidJump = new StatusUpdateRequest();
+        invalidJump.setStatus(Status.RESOLVED);
+
+        mockMvc.perform(put("/api/tickets/" + ticketId + "/status")
+                        .header("Authorization", agentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidJump)))
+                .andExpect(status().isBadRequest());
+
+        StatusUpdateRequest validProgress = new StatusUpdateRequest();
+        validProgress.setStatus(Status.IN_PROGRESS);
+
+        mockMvc.perform(put("/api/tickets/" + ticketId + "/status")
+                        .header("Authorization", agentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validProgress)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+    }
+
+    @Test
+    void testCommentPermissionsAndAdminSummary() throws Exception {
+        TicketRequest ticketReq = new TicketRequest();
+        ticketReq.setTitle("Email delivery failing");
+        ticketReq.setDescription("Outbound SMTP errors");
+        ticketReq.setPriority(Priority.LOW);
+
+        String createRes = mockMvc.perform(post("/api/tickets")
+                        .header("Authorization", customerAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ticketReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        TicketResponse createdTicket = objectMapper.readValue(createRes, TicketResponse.class);
+        Long ticketId = createdTicket.getId();
+
+        CommentRequest commentReq = new CommentRequest();
+        commentReq.setMessage("Adding extra diagnostic log details");
+
+        mockMvc.perform(post("/api/tickets/" + ticketId + "/comments")
+                        .header("Authorization", customerAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(commentReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Adding extra diagnostic log details"));
+
+        mockMvc.perform(post("/api/tickets/" + ticketId + "/comments")
+                        .header("Authorization", customerBToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(commentReq)))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/tickets/summary")
+                        .header("Authorization", customerAToken))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/tickets/summary")
+                        .header("Authorization", adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalTickets").isNumber());
+    }
+}
