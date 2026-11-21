@@ -11,6 +11,10 @@ import com.example.helpdesk_backend.entity.Ticket;
 import com.example.helpdesk_backend.enums.Priority;
 import com.example.helpdesk_backend.enums.Status;
 import com.example.helpdesk_backend.service.TicketService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,6 +24,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/tickets")
+@Tag(name = "Tickets", description = "Core ticket lifecycle, status management, assignment, search, and analytics")
 public class TicketController {
 
     private final TicketService ticketService;
@@ -29,6 +34,7 @@ public class TicketController {
     }
 
     @GetMapping
+    @Operation(summary = "List accessible tickets", description = "Retrieves tickets scoped to the authenticated caller (customers view own, agents view assigned, admins view all).")
     public List<TicketResponse> getAllTickets() {
         return ticketService.getAllTickets()
                 .stream()
@@ -37,6 +43,7 @@ public class TicketController {
     }
 
     @GetMapping("/paged")
+    @Operation(summary = "Search and filter tickets", description = "Returns a paginated list of tickets filtered by status, priority, and text search.")
     public Page<TicketResponse> getTickets(
             @RequestParam(required = false) Status status,
             @RequestParam(required = false) Priority priority,
@@ -49,6 +56,11 @@ public class TicketController {
     }
 
     @PostMapping
+    @Operation(summary = "Create ticket", description = "Creates a new ticket, sets dynamic SLA targets based on priority, and fires asynchronous audit events.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Ticket created successfully"),
+            @ApiResponse(responseCode = "400", description = "Validation failed")
+    })
     public TicketResponse createTicket(
             @Valid @RequestBody TicketRequest request) {
 
@@ -58,6 +70,12 @@ public class TicketController {
     }
 
     @GetMapping("/{id}")
+    @Operation(summary = "Get ticket by ID", description = "Retrieves ticket details enforcing customer and agent role boundaries.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Ticket found"),
+            @ApiResponse(responseCode = "403", description = "Access denied"),
+            @ApiResponse(responseCode = "404", description = "Ticket not found")
+    })
     public TicketResponse getTicketById(@PathVariable Long id) {
 
         Ticket ticket = ticketService.getTicketById(id);
@@ -66,6 +84,11 @@ public class TicketController {
     }
 
     @PutMapping("/{id}")
+    @Operation(summary = "Update ticket", description = "Updates title, description, or priority. Protected with optimistic concurrency locking (@Version).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Ticket updated"),
+            @ApiResponse(responseCode = "409", description = "Optimistic locking conflict - data was modified concurrently")
+    })
     public TicketResponse updateTicket(
             @PathVariable Long id,
             @Valid @RequestBody TicketUpdateRequest request) {
@@ -76,21 +99,25 @@ public class TicketController {
     }
 
     @DeleteMapping("/{id}")
+    @Operation(summary = "Delete ticket", description = "Deletes a ticket. Restricted to ticket owner or ADMIN.")
     public void deleteTicket(@PathVariable Long id) {
         ticketService.deleteTicket(id);
     }
 
     @GetMapping("/summary")
+    @Operation(summary = "Ticket metrics summary", description = "Aggregates ticket status counts. Cached in-memory with automatic eviction on state changes.")
     public TicketSummaryResponse getTicketSummary() {
         return ticketService.getTicketSummary();
     }
 
     @GetMapping("/agent-workload")
+    @Operation(summary = "Agent workload analytics", description = "Aggregates active ticket counts per agent. Cached in-memory with automatic eviction on state changes.")
     public List<AgentWorkloadResponse> getAgentWorkload() {
         return ticketService.getAgentWorkload();
     }
 
     @PutMapping("/{id}/status")
+    @Operation(summary = "Update ticket status", description = "Transitions ticket state according to allowed lifecycle rules. Triggers domain events and evicts cached metrics.")
     public TicketResponse updateTicketStatus(
             @PathVariable Long id,
             @Valid @RequestBody StatusUpdateRequest request) {
@@ -101,6 +128,7 @@ public class TicketController {
     }
 
     @PutMapping("/{id}/assign")
+    @Operation(summary = "Assign ticket", description = "Assigns a ticket to an agent. Restricted to ADMIN users.")
     public TicketResponse assignTicket(
             @PathVariable Long id,
             @Valid @RequestBody AssignTicketRequest request) {
