@@ -36,4 +36,14 @@ class JwtServiceTest {
 
         assertTrue(ex.getMessage().contains("at least 32 characters"));
     }
+
+    @Test
+    void shouldRejectDefaultPlaceholderSecretInNonTestProfile() {
+        IllegalStateException ex = assertThrows(
+                IllegalStateException.class,
+                () -> new JwtService("change-this-production-secret-key-32chars!", 3600000L, 604800000L, "prod")
+        );
+
+        assertTrue(ex.getMessage().contains("Default placeholder JWT secret detected"));
+    }
 }

@@ -30,6 +30,6 @@ COPY --from=builder --chown=spring:spring /workspace/target/*.jar /app/app.jar
 EXPOSE 8080 8081
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD curl -f http://localhost:8080/actuator/health || exit 1
+  CMD curl -f http://localhost:8081/actuator/health || exit 1
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

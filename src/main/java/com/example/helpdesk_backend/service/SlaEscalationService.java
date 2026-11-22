@@ -51,8 +51,8 @@ public class SlaEscalationService {
             ticketRepository.save(ticket);
             auditLogService.log("SLA_BREACH", "ticket", ticket.getId(), 0L, "SLA_MET", "SLA_BREACHED");
             log.warn("Ticket #{} has breached SLA. Due at: {}", ticket.getId(), ticket.getSlaDueAt());
-            notificationService.sendSlaBreachAlert(ticket);
         }
+        notificationService.sendSlaBreachDigestAlert(breachedTickets);
 
         return breachedTickets.size();
     }

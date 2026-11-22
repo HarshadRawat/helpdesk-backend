@@ -97,10 +97,6 @@ public class TicketService {
         throw new AccessDeniedException(MESSAGE_ACCESS_DENIED);
     }
 
-    public Page<Ticket> getTickets(Pageable pageable) {
-        return ticketRepository.findAll(pageable);
-    }
-
     @Transactional
     @CacheEvict(value = {"ticketSummary", "agentWorkload"}, allEntries = true)
     public Ticket createTicket(TicketRequest request) {

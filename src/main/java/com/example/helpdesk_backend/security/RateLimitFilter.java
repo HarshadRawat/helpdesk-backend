@@ -19,6 +19,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RateLimitFilter.class);
+
     private final int maxRequests;
     private final Duration window;
     private final Map<String, RateBucket> buckets = new ConcurrentHashMap<>();
@@ -49,6 +51,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String clientIp = extractClientIp(request);
+        log.debug("Rate limit evaluated for client IP: {}", clientIp);
         Instant now = Instant.now();
 
         // Periodic bound-check to prevent unbounded in-memory map growth

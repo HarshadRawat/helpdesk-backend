@@ -13,7 +13,7 @@ services:
       DB_URL: jdbc:mysql://mysql:3306/helpdesk_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       DB_USERNAME: root
       DB_PASSWORD: change-me
-      JWT_SECRET: replace-with-a-long-random-secret-for-production!
+      JWT_SECRET: compose-production-grade-jwt-secret-key-32chars!
       AUDIT_RETENTION_DAYS: 90
       UPLOAD_DIR: /app/uploads
       MAIL_HOST: mailpit
@@ -23,7 +23,7 @@ services:
       APP_BOOTSTRAP_ADMIN_EMAIL: admin@localhost
       APP_BOOTSTRAP_ADMIN_PASSWORD: change-me-admin-password
       SPRING_PROFILES_ACTIVE: prod
-      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      SERVER_FORWARD_HEADERS_STRATEGY: native
     volumes:
       - uploads-data:/app/uploads
     depends_on:

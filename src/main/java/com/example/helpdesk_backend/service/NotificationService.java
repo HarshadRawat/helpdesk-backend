@@ -18,13 +18,16 @@ public class NotificationService {
 
     private final JavaMailSender mailSender;
     private final String frontendUrl;
+    private final String alertEmail;
 
     @Autowired
     public NotificationService(
             JavaMailSender mailSender,
-            @Value("${app.frontend.url:http://localhost:8080}") String frontendUrl) {
+            @Value("${app.frontend.url:http://localhost:8080}") String frontendUrl,
+            @Value("${app.sla.alert-email:${app.bootstrap.admin.email:admin@localhost}}") String alertEmail) {
         this.mailSender = mailSender;
         this.frontendUrl = frontendUrl;
+        this.alertEmail = alertEmail;
     }
 
     public void sendTicketStatusNotification(Ticket ticket, User user, String oldStatus, String newStatus) {
@@ -73,7 +76,9 @@ public class NotificationService {
 
     @Async
     public void sendSlaBreachAlert(Ticket ticket) {
-        String adminEmail = "admin@localhost";
+        if (alertEmail == null || alertEmail.isBlank()) {
+            return;
+        }
         String subject = "🚨 SLA Breach Alert - Ticket #" + ticket.getId();
         String message = "Hello Admin,\n\n"
                 + "Ticket #" + ticket.getId() + " ('" + ticket.getTitle() + "') has breached its SLA resolution deadline.\n"
@@ -82,7 +87,25 @@ public class NotificationService {
                 + "Assigned Agent: " + (ticket.getAssignedTo() != null ? ticket.getAssignedTo().getName() : "Unassigned") + "\n\n"
                 + "Please review and take escalation measures.";
 
-        sendEmail(adminEmail, subject, message);
+        sendEmail(alertEmail, subject, message);
+    }
+
+    @Async
+    public void sendSlaBreachDigestAlert(java.util.List<Ticket> breachedTickets) {
+        if (breachedTickets == null || breachedTickets.isEmpty() || alertEmail == null || alertEmail.isBlank()) {
+            return;
+        }
+        String subject = "🚨 SLA Breach Digest Alert - " + breachedTickets.size() + " ticket(s) overdue";
+        StringBuilder sb = new StringBuilder();
+        sb.append("Hello Admin,\n\n");
+        sb.append("The following ").append(breachedTickets.size()).append(" ticket(s) have breached their SLA resolution deadlines:\n\n");
+        for (Ticket ticket : breachedTickets) {
+            sb.append("- Ticket #").append(ticket.getId())
+                    .append(" [Priority: ").append(ticket.getPriority()).append("] ")
+                    .append(": '").append(ticket.getTitle()).append("'\n");
+        }
+        sb.append("\nPlease review these tickets promptly in the HelpDesk portal.\n");
+        sendEmail(alertEmail, subject, sb.toString());
     }
 
     private void sendEmail(String to, String subject, String message) {

@@ -53,7 +53,7 @@ class SlaEscalationServiceTest {
         assertTrue(ticket.isSlaBreached());
         verify(ticketRepository).save(ticket);
         verify(auditLogService).log(eq("SLA_BREACH"), eq("ticket"), eq(101L), eq(0L), any(), any());
-        verify(notificationService).sendSlaBreachAlert(ticket);
+        verify(notificationService).sendSlaBreachDigestAlert(List.of(ticket));
     }
 
     @Test

@@ -57,5 +57,35 @@ class FlywayMySQLMigrationIntegrationTest {
 
         Integer ticketCount = jdbcTemplate.queryForObject("SELECT count(*) FROM ticket", Integer.class);
         assertNotNull(ticketCount);
+
+        // Verify full MySQL schema lifecycle: insert user, insert ticket with FK and timestamps, read back
+        jdbcTemplate.update(
+                "INSERT INTO users (name, email, password, role, active) VALUES (?, ?, ?, ?, ?)",
+                "MySQL Admin", "mysql_admin@helpdesk.com", "HashedPassword123!", "ADMIN", true
+        );
+        Long userId = jdbcTemplate.queryForObject(
+                "SELECT id FROM users WHERE email = 'mysql_admin@helpdesk.com'", Long.class
+        );
+        assertNotNull(userId);
+
+        jdbcTemplate.update(
+                "INSERT INTO ticket (title, description, priority, status, created_by, version, sla_due_at, sla_breached, deleted) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?)",
+                "MySQL Production Readiness Ticket", "Testing MySQL schema and triggers", "URGENT", "OPEN", userId, 0L, false, false
+        );
+
+        java.util.Map<String, Object> ticketRow = jdbcTemplate.queryForMap(
+                "SELECT id, title, priority, status, version, sla_breached, deleted, created_at, updated_at " +
+                        "FROM ticket WHERE created_by = ?", userId
+        );
+
+        assertEquals("MySQL Production Readiness Ticket", ticketRow.get("title"));
+        assertEquals("URGENT", ticketRow.get("priority"));
+        assertEquals("OPEN", ticketRow.get("status"));
+        assertEquals(0L, ((Number) ticketRow.get("version")).longValue());
+        assertEquals(false, ticketRow.get("sla_breached"));
+        assertEquals(false, ticketRow.get("deleted"));
+        assertNotNull(ticketRow.get("created_at"));
+        assertNotNull(ticketRow.get("updated_at"));
     }
 }

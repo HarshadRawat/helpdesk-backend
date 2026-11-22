@@ -277,7 +277,7 @@ Services launched:
 This project is architected with realistic trade-offs suitable for medium-scale enterprise deployments and cleanly decouples areas for high-scale cloud migration:
 
 1. **In-Memory Rate Limiting vs Distributed Rate Limiting**:
-   - *Current Implementation*: Uses in-memory token bucket algorithms (`RateLimitFilter`) mapped per client IP, operating with reverse proxy header security (`server.forward-headers-strategy=framework`).
+   - *Current Implementation*: Uses in-memory token bucket algorithms (`RateLimitFilter`) mapped per client IP, operating with reverse proxy header security (`server.forward-headers-strategy=native`). Tomcat's `RemoteIpValve` reads forwarded IPs from trusted upstream reverse proxies (including private Docker network CIDR ranges) to prevent client spoofing while ensuring distinct client buckets.
    - *Production Trade-off*: Zero external infrastructure overhead for single-instance or sticky-session deployments. In a horizontally scaled, multi-instance production cluster behind a load balancer, rate limits should be backed by a centralized distributed store like **Redis** (e.g., Bucket4j Redis integration) or enforced at the cloud API Gateway layer (AWS API Gateway, Cloudflare, Envoy).
 
 2. **Local Disk Attachments vs Cloud Object Storage**:
@@ -286,7 +286,11 @@ This project is architected with realistic trade-offs suitable for medium-scale 
 
 3. **Upstream TLS / SSL Termination**:
    - *Current Implementation*: The containerized Spring Boot application runs plaintext HTTP internally (ports 8080/8081).
-   - *Production Trade-off*: Enterprise standard practice terminates TLS/SSL upstream at the reverse proxy (Nginx), Kubernetes Ingress Controller, or cloud load balancer (e.g., AWS ALB / Cloudflare). The application securely reconstructs scheme, host, and client IPs using standard `X-Forwarded-*` headers handled by Spring's `ForwardedHeaderFilter`.
+   - *Production Trade-off*: Enterprise standard practice terminates TLS/SSL upstream at the reverse proxy (Nginx), Kubernetes Ingress Controller, or cloud load balancer (e.g., AWS ALB / Cloudflare). The application securely reconstructs scheme, host, and client IPs using standard `X-Forwarded-*` headers handled natively by Tomcat's `RemoteIpValve`.
+
+4. **Stateless Access Token Lifespan upon Deactivation**:
+   - *Current Implementation*: Access tokens are stateless cryptographic JWTs valid for 1 hour (`app.jwt.access-expiration-ms=3600000`). When an admin deactivates a user, all active refresh tokens are immediately revoked and further logins are blocked. However, an already issued, unexpired stateless access token remains cryptographically valid until its 1-hour expiration.
+   - *Production Trade-off*: Eliminates database or cache lookup overhead on every authenticated request (pure CPU verification). In environments requiring instantaneous sub-second revocation of access tokens across all active requests, a distributed token blocklist (e.g., Redis blacklisting with TTL matching token expiry) or an active user status cache check in `JwtFilter` can be enabled.
 
 ---
 

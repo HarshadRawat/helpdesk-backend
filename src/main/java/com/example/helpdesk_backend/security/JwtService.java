@@ -20,16 +20,28 @@ public class JwtService {
     private final long accessTokenExpirationMs;
     private final long refreshTokenExpirationMs;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public JwtService(
             @Value("${app.jwt.secret}") String secretKey,
             @Value("${app.jwt.access-expiration-ms:3600000}") long accessTokenExpirationMs,
-            @Value("${app.jwt.refresh-expiration-ms:604800000}") long refreshTokenExpirationMs) {
+            @Value("${app.jwt.refresh-expiration-ms:604800000}") long refreshTokenExpirationMs,
+            @Value("${spring.profiles.active:}") String activeProfile) {
         if (secretKey == null || secretKey.length() < 32) {
             throw new IllegalArgumentException("JWT secret must be configured and at least 32 characters long");
+        }
+        if (activeProfile == null || (!activeProfile.equalsIgnoreCase("test") && !activeProfile.toLowerCase().contains("test"))) {
+            if ("change-this-production-secret-key-32chars!".equalsIgnoreCase(secretKey)
+                    || "replace-with-a-long-random-secret-for-production!".equalsIgnoreCase(secretKey)) {
+                throw new IllegalStateException("Default placeholder JWT secret detected in non-test environment. Please configure a custom JWT_SECRET.");
+            }
         }
         this.secretKey = secretKey;
         this.accessTokenExpirationMs = accessTokenExpirationMs;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
+    }
+
+    public JwtService(String secretKey, long accessTokenExpirationMs, long refreshTokenExpirationMs) {
+        this(secretKey, accessTokenExpirationMs, refreshTokenExpirationMs, "test");
     }
 
     private SecretKey getSigningKey() {
