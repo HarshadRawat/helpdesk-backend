@@ -238,12 +238,12 @@ cd helpdesk-backend/helpdesk-backend
 ```
 
 ### 2. Configure Environment Secrets
-Create a `.env` file or export environment variables:
+Create a `.env` file or export environment variables (generate a cryptographically secure 32+ character JWT secret with `openssl rand -base64 48`):
 ```bash
 export DB_URL=jdbc:mysql://localhost:3306/helpdesk_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
 export DB_USERNAME=root
 export DB_PASSWORD=your_secure_password
-export JWT_SECRET=your-32-character-secret-key-for-jwt-auth!
+export JWT_SECRET=$(openssl rand -base64 48)
 export SPRING_PROFILES_ACTIVE=dev
 ```
 
@@ -261,10 +261,14 @@ Explore the API documentation at `http://localhost:8080/swagger-ui.html`.
 The backend includes a production-ready multi-container Docker Compose configuration:
 
 ```bash
-# 1. Copy environment template and configure secrets
+# 1. Copy environment template
 cp .env.example .env
 
-# 2. Launch production containers
+# 2. Generate and set a secure JWT secret in .env
+# openssl rand -base64 48
+# Note: Docker Compose enforces JWT_SECRET presence and will fail startup if left blank.
+
+# 3. Launch production containers
 docker compose up -d --build
 ```
 

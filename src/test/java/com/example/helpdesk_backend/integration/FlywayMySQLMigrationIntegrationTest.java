@@ -15,6 +15,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@org.springframework.test.context.ActiveProfiles("test")
 @Testcontainers(disabledWithoutDocker = true)
 class FlywayMySQLMigrationIntegrationTest {
 
@@ -32,6 +33,7 @@ class FlywayMySQLMigrationIntegrationTest {
         registry.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
         registry.add("spring.flyway.enabled", () -> "true");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
+        registry.add("app.jwt.secret", () -> "testcontainers-mysql-secret-key-that-is-at-least-32-chars-long!");
     }
 
     @Autowired(required = false)
