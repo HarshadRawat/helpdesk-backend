@@ -55,7 +55,7 @@ class FlywayMySQLMigrationIntegrationTest {
         Integer userCount = jdbcTemplate.queryForObject("SELECT count(*) FROM users", Integer.class);
         assertNotNull(userCount);
 
-        Integer ticketCount = jdbcTemplate.queryForObject("SELECT count(*) FROM tickets", Integer.class);
+        Integer ticketCount = jdbcTemplate.queryForObject("SELECT count(*) FROM ticket", Integer.class);
         assertNotNull(ticketCount);
     }
 }
