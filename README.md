@@ -5,7 +5,7 @@
 [![Spring Security](https://img.shields.io/badge/Security-Spring%20Security%207-blue.svg)](https://spring.io/projects/spring-security)
 [![Database](https://img.shields.io/badge/Database-MySQL%20%7C%20Flyway-blue.svg)](https://flywaydb.org/)
 [![Architecture](https://img.shields.io/badge/Architecture-Event--Driven%20%7C%20Cached-purple.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-40%20Passed-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-44%20Passed-success.svg)]()
 
 A production-grade, enterprise-ready IT Operations and HelpDesk Ticket Management backend built with **Spring Boot 4**, **Java 17**, and **Spring Security**. Engineered for high reliability, concurrent workloads, real-world data isolation, and regulatory audit compliance.
 
@@ -123,7 +123,7 @@ helpdesk-backend/
 │   │       ├── db/migration/           # Versioned Flyway SQL migrations (V1 to V4)
 │   │       ├── application.properties  # Base configuration
 │   │       └── application-prod.properties
-│   └── test/                           # 40 Unit & Integration tests
+│   └── test/                           # 44 Unit & Integration tests
 │       └── java/com/example/helpdesk_backend/
 │           ├── event/                  # Event listener tests
 │           ├── integration/            # MockMvc RBAC, Auth, and Security integration tests
@@ -202,7 +202,7 @@ Interactive Swagger UI documentation is available at **`/swagger-ui.html`**.
 
 ## 🧪 Comprehensive Test Suite
 
-The project includes **40 automated tests** spanning unit, integration, and security layers:
+The project includes **44 automated tests** spanning unit, integration, and security layers:
 
 ```bash
 # Run all tests via Maven Wrapper
@@ -282,5 +282,5 @@ Services launched:
 - [x] **Performance Optimization**: In-memory caching for expensive analytical aggregates with automatic eviction.
 - [x] **File Safety**: MIME whitelist enforcement, file-size guards, and sanitized disk storage.
 - [x] **Observability**: Prometheus metrics export, structured MDC request correlation, and audit logging.
-- [x] **Automated Testing**: 40 tests covering unit, MockMvc security, caching, and domain logic.
+- [x] **Automated Testing**: 44 tests covering unit, MockMvc security, caching, and domain logic.
 - [x] **Interactive Documentation**: OpenAPI 3.0 / Swagger UI integration with JWT Bearer support.

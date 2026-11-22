@@ -25,7 +25,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public RateLimitFilter(
-            @Value("${app.rate-limit.max-requests:10}") int maxRequests,
+            @Value("${app.rate-limit.max-requests:60}") int maxRequests,
             @Value("${app.rate-limit.window-seconds:60}") long windowSeconds) {
         this.maxRequests = maxRequests;
         this.window = Duration.ofSeconds(windowSeconds);
@@ -34,22 +34,29 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path.startsWith("/actuator")
-                || path.startsWith("/swagger-ui")
-                || path.startsWith("/v3/api-docs");
+        String method = request.getMethod();
+
+        // Only rate-limit public authentication and registration endpoints to protect against brute-force attacks
+        boolean isAuthEndpoint = path.startsWith("/api/auth");
+        boolean isPublicSignup = path.equals("/api/users") && "POST".equalsIgnoreCase(method);
+
+        // Allow all other operational and non-auth traffic through without throttling
+        return !(isAuthEndpoint || isPublicSignup);
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        String clientIp = request.getRemoteAddr();
-        if (clientIp == null || clientIp.isBlank()) {
-            clientIp = "unknown";
+        String clientIp = extractClientIp(request);
+        Instant now = Instant.now();
+
+        // Periodic bound-check to prevent unbounded in-memory map growth
+        if (buckets.size() > 5000) {
+            buckets.entrySet().removeIf(entry -> entry.getValue().isExpired(now, window));
         }
 
         RateBucket bucket = buckets.computeIfAbsent(clientIp, key -> new RateBucket());
-        Instant now = Instant.now();
 
         synchronized (bucket) {
             if (bucket.isExpired(now, window)) {
@@ -64,7 +71,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 Map<String, Object> payload = new LinkedHashMap<>();
                 payload.put("timestamp", Instant.now().toString());
                 payload.put("status", 429);
-                payload.put("error", "Too many requests");
+                payload.put("error", "Too Many Requests");
                 payload.put("message", "Too many requests. Please try again later.");
                 payload.put("path", request.getRequestURI());
 
@@ -77,6 +84,21 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String extractClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isBlank()) {
+            return xRealIp.trim();
+        }
+
+        String remoteAddr = request.getRemoteAddr();
+        return (remoteAddr != null && !remoteAddr.isBlank()) ? remoteAddr : "unknown";
     }
 
     private static class RateBucket {
