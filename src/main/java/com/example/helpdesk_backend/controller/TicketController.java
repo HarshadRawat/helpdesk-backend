@@ -34,12 +34,13 @@ public class TicketController {
     }
 
     @GetMapping
-    @Operation(summary = "List accessible tickets", description = "Retrieves tickets scoped to the authenticated caller (customers view own, agents view assigned, admins view all).")
-    public List<TicketResponse> getAllTickets() {
-        return ticketService.getAllTickets()
-                .stream()
-                .map(ticket -> ticketService.toResponse(ticket))
-                .toList();
+    @Operation(summary = "List accessible tickets", description = "Retrieves tickets scoped to the authenticated caller with safe pagination (capped at 100).")
+    public Page<TicketResponse> getAllTickets(
+            @RequestParam(required = false) Status status,
+            @RequestParam(required = false) Priority priority,
+            @RequestParam(required = false) String search,
+            Pageable pageable) {
+        return getTickets(status, priority, search, pageable);
     }
 
     @GetMapping("/paged")

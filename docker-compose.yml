@@ -13,7 +13,7 @@ services:
       DB_URL: jdbc:mysql://mysql:3306/helpdesk_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       DB_USERNAME: root
       DB_PASSWORD: change-me
-      JWT_SECRET: compose-production-grade-jwt-secret-key-32chars!
+      JWT_SECRET: ${JWT_SECRET:?Please set JWT_SECRET in .env file}
       AUDIT_RETENTION_DAYS: 90
       UPLOAD_DIR: /app/uploads
       MAIL_HOST: mailpit

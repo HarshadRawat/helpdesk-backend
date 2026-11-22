@@ -33,6 +33,7 @@ build/
 .vscode/
 .env
 .env.*
+!.env.example
 local-secrets.properties
 secrets/
 *.log

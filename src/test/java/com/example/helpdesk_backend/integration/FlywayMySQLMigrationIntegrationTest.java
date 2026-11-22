@@ -40,6 +40,12 @@ class FlywayMySQLMigrationIntegrationTest {
     @Autowired(required = false)
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired(required = false)
+    private com.example.helpdesk_backend.repository.UserRepository userRepository;
+
+    @Autowired(required = false)
+    private com.example.helpdesk_backend.repository.TicketRepository ticketRepository;
+
     @Test
     void testFlywayMigrationsAppliedOnRealMySQL() {
         if (!mysql.isRunning()) {
@@ -87,5 +93,34 @@ class FlywayMySQLMigrationIntegrationTest {
         assertEquals(false, ticketRow.get("deleted"));
         assertNotNull(ticketRow.get("created_at"));
         assertNotNull(ticketRow.get("updated_at"));
+
+        // Verify real JPA entity save & query on MySQL (validates Instant, Enums, FKs, and @SQLRestriction)
+        if (userRepository != null && ticketRepository != null) {
+            com.example.helpdesk_backend.entity.User jpaUser = new com.example.helpdesk_backend.entity.User();
+            jpaUser.setName("JPA MySQL User");
+            jpaUser.setEmail("jpa_user@helpdesk.com");
+            jpaUser.setPassword("Password123!");
+            jpaUser.setRole(com.example.helpdesk_backend.enums.Role.CUSTOMER);
+            jpaUser = userRepository.save(jpaUser);
+            assertNotNull(jpaUser.getId());
+
+            com.example.helpdesk_backend.entity.Ticket jpaTicket = new com.example.helpdesk_backend.entity.Ticket();
+            jpaTicket.setTitle("JPA Hibernate MySQL Ticket");
+            jpaTicket.setDescription("Testing Instant and @SQLRestriction mapping");
+            jpaTicket.setPriority(com.example.helpdesk_backend.enums.Priority.HIGH);
+            jpaTicket.setStatus(com.example.helpdesk_backend.enums.Status.OPEN);
+            jpaTicket.setCreatedBy(jpaUser);
+            jpaTicket.setSlaDueAt(java.time.Instant.now().plusSeconds(14400));
+            jpaTicket = ticketRepository.save(jpaTicket);
+
+            assertNotNull(jpaTicket.getId());
+            assertNotNull(jpaTicket.getCreatedAt());
+            assertNotNull(jpaTicket.getUpdatedAt());
+            assertFalse(jpaTicket.isDeleted());
+
+            java.util.Optional<com.example.helpdesk_backend.entity.Ticket> found = ticketRepository.findById(jpaTicket.getId());
+            assertTrue(found.isPresent());
+            assertEquals("JPA Hibernate MySQL Ticket", found.get().getTitle());
+        }
     }
 }

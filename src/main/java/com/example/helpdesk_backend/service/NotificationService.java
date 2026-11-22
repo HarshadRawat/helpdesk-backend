@@ -75,22 +75,6 @@ public class NotificationService {
     }
 
     @Async
-    public void sendSlaBreachAlert(Ticket ticket) {
-        if (alertEmail == null || alertEmail.isBlank()) {
-            return;
-        }
-        String subject = "🚨 SLA Breach Alert - Ticket #" + ticket.getId();
-        String message = "Hello Admin,\n\n"
-                + "Ticket #" + ticket.getId() + " ('" + ticket.getTitle() + "') has breached its SLA resolution deadline.\n"
-                + "Priority: " + ticket.getPriority() + "\n"
-                + "Due At: " + ticket.getSlaDueAt() + "\n"
-                + "Assigned Agent: " + (ticket.getAssignedTo() != null ? ticket.getAssignedTo().getName() : "Unassigned") + "\n\n"
-                + "Please review and take escalation measures.";
-
-        sendEmail(alertEmail, subject, message);
-    }
-
-    @Async
     public void sendSlaBreachDigestAlert(java.util.List<Ticket> breachedTickets) {
         if (breachedTickets == null || breachedTickets.isEmpty() || alertEmail == null || alertEmail.isBlank()) {
             return;

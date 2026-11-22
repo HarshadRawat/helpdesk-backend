@@ -261,6 +261,10 @@ Explore the API documentation at `http://localhost:8080/swagger-ui.html`.
 The backend includes a production-ready multi-container Docker Compose configuration:
 
 ```bash
+# 1. Copy environment template and configure secrets
+cp .env.example .env
+
+# 2. Launch production containers
 docker compose up -d --build
 ```
 
