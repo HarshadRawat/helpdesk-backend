@@ -34,7 +34,7 @@ public class RefreshTokenService {
         return refreshToken;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = InvalidLoginException.class)
     public RotationResult rotate(String refreshTokenValue) {
         RefreshToken storedToken = findAndValidateStoredToken(refreshTokenValue);
 

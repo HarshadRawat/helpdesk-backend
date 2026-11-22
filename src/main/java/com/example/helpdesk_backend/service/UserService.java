@@ -7,6 +7,8 @@ import com.example.helpdesk_backend.enums.Role;
 import com.example.helpdesk_backend.exception.EmailAlreadyExistsException;
 import com.example.helpdesk_backend.exception.UserNotFoundException;
 import com.example.helpdesk_backend.repository.UserRepository;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,17 +40,23 @@ public class UserService {
 
     @Transactional
     public User createUser(UserRequest request) {
+        String normalizedEmail = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
 
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new EmailAlreadyExistsException(request.getEmail());
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            throw new EmailAlreadyExistsException(normalizedEmail);
         }
 
-        Role role = request.getRole() == null ? Role.CUSTOMER : request.getRole();
+        // Public registrations MUST always default to CUSTOMER.
+        // Role assignment is strictly permitted only if an authenticated ADMIN makes the request.
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdmin = auth != null && auth.isAuthenticated() && auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+
+        Role role = (isAdmin && request.getRole() != null) ? request.getRole() : Role.CUSTOMER;
 
         User user = new User();
-
         user.setName(request.getName());
-        user.setEmail(request.getEmail());
+        user.setEmail(normalizedEmail);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setRole(role);
 
@@ -77,14 +85,11 @@ public class UserService {
     }
 
     public UserResponse toResponse(User user) {
-
         UserResponse response = new UserResponse();
-
         response.setId(user.getId());
         response.setName(user.getName());
         response.setEmail(user.getEmail());
         response.setRole(user.getRole());
-
         return response;
     }
 }

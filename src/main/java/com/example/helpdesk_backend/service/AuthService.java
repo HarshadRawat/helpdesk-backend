@@ -36,7 +36,7 @@ public class AuthService {
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
-        String email = request.getEmail() == null ? "" : request.getEmail().trim();
+        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
 
         if (loginAttemptTracker.isBlocked(email)) {
             throw new InvalidLoginException("Too many failed login attempts. Please try again later.");
@@ -61,7 +61,7 @@ public class AuthService {
         return new LoginResponse(accessToken, refreshTokenValue);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = InvalidLoginException.class)
     public LoginResponse refreshToken(String refreshToken) {
         RefreshTokenService.RotationResult rotationResult = refreshTokenService.rotate(refreshToken);
         User user = rotationResult.user();
