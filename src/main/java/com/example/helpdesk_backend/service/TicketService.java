@@ -12,6 +12,8 @@ import com.example.helpdesk_backend.exception.InvalidTicketAssignmentException;
 import com.example.helpdesk_backend.exception.InvalidTicketStatusException;
 import com.example.helpdesk_backend.exception.TicketNotFoundException;
 import com.example.helpdesk_backend.exception.UserNotFoundException;
+import com.example.helpdesk_backend.repository.CommentRepository;
+import com.example.helpdesk_backend.repository.TicketAttachmentRepository;
 import com.example.helpdesk_backend.repository.TicketRepository;
 import com.example.helpdesk_backend.repository.UserRepository;
 import org.springframework.cache.annotation.CacheEvict;
@@ -19,6 +21,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -48,17 +51,23 @@ public class TicketService {
 
     private final TicketRepository ticketRepository;
     private final UserRepository userRepository;
+    private final CommentRepository commentRepository;
+    private final TicketAttachmentRepository ticketAttachmentRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final AuditLogService auditLogService;
 
     public TicketService(
             TicketRepository ticketRepository,
             UserRepository userRepository,
+            CommentRepository commentRepository,
+            TicketAttachmentRepository ticketAttachmentRepository,
             ApplicationEventPublisher eventPublisher,
             AuditLogService auditLogService) {
 
         this.ticketRepository = ticketRepository;
         this.userRepository = userRepository;
+        this.commentRepository = commentRepository;
+        this.ticketAttachmentRepository = ticketAttachmentRepository;
         this.eventPublisher = eventPublisher;
         this.auditLogService = auditLogService;
     }
@@ -109,7 +118,7 @@ public class TicketService {
         ticket.setSlaBreached(false);
 
         Ticket savedTicket = ticketRepository.save(ticket);
-        auditLogService.log("CREATE", "ticket", savedTicket.getId(), userId, null, savedTicket);
+        auditLogService.log("CREATE", "ticket", savedTicket.getId(), userId, null, toSnapshot(savedTicket));
         return savedTicket;
     }
 
@@ -144,13 +153,11 @@ public class TicketService {
                 ACTION_UPDATE
         );
 
-        Ticket snapshot = new Ticket();
-        snapshot.setTitle(ticket.getTitle());
-        snapshot.setDescription(ticket.getDescription());
-        snapshot.setPriority(ticket.getPriority());
-        snapshot.setStatus(ticket.getStatus());
-        snapshot.setCreatedBy(ticket.getCreatedBy());
-        snapshot.setAssignedTo(ticket.getAssignedTo());
+        if (request.getVersion() != null && !request.getVersion().equals(ticket.getVersion())) {
+            throw new ObjectOptimisticLockingFailureException(Ticket.class, id);
+        }
+
+        TicketAuditSnapshot oldSnapshot = toSnapshot(ticket);
 
         ticket.setTitle(request.getTitle());
         ticket.setDescription(request.getDescription());
@@ -162,7 +169,7 @@ public class TicketService {
         }
 
         Ticket savedTicket = ticketRepository.save(ticket);
-        auditLogService.log("UPDATE", "ticket", savedTicket.getId(), actorId, snapshot, savedTicket);
+        auditLogService.log("UPDATE", "ticket", savedTicket.getId(), actorId, oldSnapshot, toSnapshot(savedTicket));
         return savedTicket;
     }
 
@@ -182,6 +189,8 @@ public class TicketService {
                 ACTION_DELETE
         );
 
+        commentRepository.deleteByTicketId(id);
+        ticketAttachmentRepository.deleteByTicketId(id);
         ticketRepository.delete(ticket);
     }
 
@@ -197,6 +206,10 @@ public class TicketService {
                 .orElseThrow(() -> new TicketNotFoundException(id));
 
         assertCanActOnTicket(ticket, actorId, role, ACTION_UPDATE);
+
+        if (request.getVersion() != null && !request.getVersion().equals(ticket.getVersion())) {
+            throw new ObjectOptimisticLockingFailureException(Ticket.class, id);
+        }
 
         Status currentStatus = ticket.getStatus();
         Status newStatus = request.getStatus();
@@ -280,6 +293,10 @@ public class TicketService {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new TicketNotFoundException(ticketId));
 
+        if (request.getVersion() != null && !request.getVersion().equals(ticket.getVersion())) {
+            throw new ObjectOptimisticLockingFailureException(Ticket.class, ticketId);
+        }
+
         User agent = userRepository.findById(request.getAgentId())
                 .orElseThrow(() ->
                         new UserNotFoundException(request.getAgentId()));
@@ -294,7 +311,7 @@ public class TicketService {
         ticket.setAssignedTo(agent);
 
         Ticket savedTicket = ticketRepository.save(ticket);
-        auditLogService.log("ASSIGN", "ticket", savedTicket.getId(), actorId, previousAgent, agent);
+        auditLogService.log("ASSIGN", "ticket", savedTicket.getId(), actorId, toUserSnapshot(previousAgent), toUserSnapshot(agent));
         eventPublisher.publishEvent(new TicketAssignedEvent(savedTicket, agent));
         return savedTicket;
     }
@@ -524,5 +541,32 @@ public class TicketService {
             case MEDIUM -> Instant.now().plus(Duration.ofHours(24));
             case LOW -> Instant.now().plus(Duration.ofHours(72));
         };
+    }
+
+    private TicketAuditSnapshot toSnapshot(Ticket ticket) {
+        if (ticket == null) {
+            return null;
+        }
+        return new TicketAuditSnapshot(
+                ticket.getTitle(),
+                ticket.getDescription(),
+                ticket.getPriority() != null ? ticket.getPriority().name() : null,
+                ticket.getStatus() != null ? ticket.getStatus().name() : null,
+                ticket.getCreatedBy() != null ? ticket.getCreatedBy().getId() : null,
+                ticket.getAssignedTo() != null ? ticket.getAssignedTo().getId() : null,
+                ticket.getSlaDueAt(),
+                ticket.getVersion()
+        );
+    }
+
+    private UserAuditSnapshot toUserSnapshot(User user) {
+        if (user == null) {
+            return null;
+        }
+        return new UserAuditSnapshot(
+                user.getId(),
+                user.getName(),
+                user.getEmail()
+        );
     }
 }

@@ -15,6 +15,8 @@ public class TicketUpdateRequest {
     @NotNull
     private Priority priority;
 
+    private Long version;
+
     public String getTitle() {
         return title;
     }
@@ -37,5 +39,13 @@ public class TicketUpdateRequest {
 
     public void setPriority(Priority priority) {
         this.priority = priority;
+    }
+
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
     }
 }

@@ -225,13 +225,91 @@ class TicketSecurityIntegrationTest {
                         .content(objectMapper.writeValueAsString(commentReq)))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(get("/api/tickets/summary")
-                        .header("Authorization", customerAToken))
-                .andExpect(status().isForbidden());
-
+        // Admin warms the cache first:
         mockMvc.perform(get("/api/tickets/summary")
                         .header("Authorization", adminToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalTickets").isNumber());
+
+        // Cache hit must NOT bypass security for customer:
+        mockMvc.perform(get("/api/tickets/summary")
+                        .header("Authorization", customerAToken))
+                .andExpect(status().isForbidden());
+
+        // Audit trail is restricted to admins:
+        mockMvc.perform(get("/api/audit/tickets/" + ticketId)
+                        .header("Authorization", customerAToken))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/audit/tickets/" + ticketId)
+                        .header("Authorization", adminToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void testOptimisticLockingConflictWhenVersionMismatches() throws Exception {
+        TicketRequest ticketReq = new TicketRequest();
+        ticketReq.setTitle("Concurrency issue test");
+        ticketReq.setDescription("Testing Alice and Bob version conflict");
+        ticketReq.setPriority(Priority.HIGH);
+
+        String createRes = mockMvc.perform(post("/api/tickets")
+                        .header("Authorization", customerAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ticketReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        TicketResponse created = objectMapper.readValue(createRes, TicketResponse.class);
+        Long ticketId = created.getId();
+
+        // Stale update sending an outdated version (e.g. version 99 when ticket is at version 0)
+        TicketUpdateRequest staleUpdate = new TicketUpdateRequest();
+        staleUpdate.setTitle("Updated by Alice");
+        staleUpdate.setDescription("Alice saved first");
+        staleUpdate.setPriority(Priority.HIGH);
+        staleUpdate.setVersion(99L);
+
+        mockMvc.perform(put("/api/tickets/" + ticketId)
+                        .header("Authorization", customerAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(staleUpdate)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("Conflict"));
+    }
+
+    @Test
+    void testCascadeDeleteTicketWithComments() throws Exception {
+        TicketRequest ticketReq = new TicketRequest();
+        ticketReq.setTitle("Ticket to delete");
+        ticketReq.setDescription("Should cascade comments on delete");
+        ticketReq.setPriority(Priority.LOW);
+
+        String createRes = mockMvc.perform(post("/api/tickets")
+                        .header("Authorization", customerAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ticketReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        TicketResponse created = objectMapper.readValue(createRes, TicketResponse.class);
+        Long ticketId = created.getId();
+
+        CommentRequest commentReq = new CommentRequest();
+        commentReq.setMessage("Diagnostic comment attached to ticket");
+
+        mockMvc.perform(post("/api/tickets/" + ticketId + "/comments")
+                        .header("Authorization", customerAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(commentReq)))
+                .andExpect(status().isOk());
+
+        // Deleting the ticket must cascade and succeed with 200 OK (no 500 foreign key failure)
+        mockMvc.perform(delete("/api/tickets/" + ticketId)
+                        .header("Authorization", customerAToken))
+                .andExpect(status().isOk());
+
+        org.junit.jupiter.api.Assertions.assertFalse(ticketRepository.existsById(ticketId));
+        org.junit.jupiter.api.Assertions.assertTrue(commentRepository.findByTicketId(ticketId).isEmpty());
     }
 }

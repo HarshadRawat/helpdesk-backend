@@ -217,6 +217,34 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation(
+            org.springframework.dao.DataIntegrityViolationException ex,
+            HttpServletRequest request) {
+
+        return buildErrorResponse(
+                HttpStatus.CONFLICT,
+                "Data integrity violation",
+                "The operation could not be completed because of database constraints.",
+                request,
+                null
+        );
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiErrorResponse> handleGeneralException(
+            Exception ex,
+            HttpServletRequest request) {
+
+        return buildErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Internal server error",
+                "An unexpected error occurred while processing the request.",
+                request,
+                null
+        );
+    }
+
     private ResponseEntity<ApiErrorResponse> buildErrorResponse(
             HttpStatus status,
             String error,

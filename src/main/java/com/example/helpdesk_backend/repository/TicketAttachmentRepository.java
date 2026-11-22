@@ -11,4 +11,6 @@ public interface TicketAttachmentRepository extends JpaRepository<TicketAttachme
     List<TicketAttachment> findByTicketId(Long ticketId);
 
     Optional<TicketAttachment> findByIdAndTicketId(Long id, Long ticketId);
+
+    void deleteByTicketId(Long ticketId);
 }

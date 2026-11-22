@@ -13,6 +13,8 @@ import com.example.helpdesk_backend.event.TicketAssignedEvent;
 import com.example.helpdesk_backend.event.TicketStatusChangedEvent;
 import com.example.helpdesk_backend.exception.InvalidTicketAssignmentException;
 import com.example.helpdesk_backend.exception.InvalidTicketStatusException;
+import com.example.helpdesk_backend.repository.CommentRepository;
+import com.example.helpdesk_backend.repository.TicketAttachmentRepository;
 import com.example.helpdesk_backend.repository.TicketRepository;
 import com.example.helpdesk_backend.repository.UserRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -43,6 +45,12 @@ class TicketServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private CommentRepository commentRepository;
+
+    @Mock
+    private TicketAttachmentRepository ticketAttachmentRepository;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;

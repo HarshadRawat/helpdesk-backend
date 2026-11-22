@@ -17,7 +17,7 @@ import java.util.List;
 public class AuditLogService {
 
     private final AuditLogRepository auditLogRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
     @Value("${app.audit.retention-days:90}")
     private int retentionDays;
