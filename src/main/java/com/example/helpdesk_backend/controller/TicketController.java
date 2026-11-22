@@ -50,8 +50,15 @@ public class TicketController {
             @RequestParam(required = false) String search,
             Pageable pageable) {
 
+        int cappedSize = Math.min(pageable.getPageSize(), 100);
+        Pageable safePageable = org.springframework.data.domain.PageRequest.of(
+                pageable.getPageNumber(),
+                cappedSize,
+                pageable.getSort()
+        );
+
         return ticketService
-                .getFilteredTickets(status, priority, search, pageable)
+                .getFilteredTickets(status, priority, search, safePageable)
                 .map(ticket -> ticketService.toResponse(ticket));
     }
 

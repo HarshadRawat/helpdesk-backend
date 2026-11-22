@@ -52,11 +52,14 @@ public class NotificationService {
             return;
         }
 
+        String resetUrl = "http://localhost:8080/reset-password?token=" + resetToken;
         String subject = "HelpDesk - Password Reset Request";
         String message = "Hello " + user.getName() + ",\n\n"
                 + "A password reset request was received for your account.\n"
-                + "Your reset token is: " + resetToken + "\n\n"
-                + "This token will expire in 15 minutes. If you did not request this, please ignore this email.";
+                + "You can reset your password using the link below:\n"
+                + resetUrl + "\n\n"
+                + "Reset token: " + resetToken + "\n\n"
+                + "This link will expire in 15 minutes. If you did not request this, please ignore this email.";
 
         sendEmail(user.getEmail(), subject, message);
     }

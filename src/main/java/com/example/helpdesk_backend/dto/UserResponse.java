@@ -8,6 +8,7 @@ public class UserResponse {
     private String name;
     private String email;
     private Role role;
+    private boolean active;
 
     public Long getId() {
         return id;
@@ -39,5 +40,13 @@ public class UserResponse {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
     }
 }

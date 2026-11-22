@@ -6,6 +6,7 @@ import com.example.helpdesk_backend.dto.StatusUpdateRequest;
 import com.example.helpdesk_backend.dto.TicketRequest;
 import com.example.helpdesk_backend.dto.TicketResponse;
 import com.example.helpdesk_backend.dto.TicketUpdateRequest;
+import com.example.helpdesk_backend.dto.UserResponse;
 import com.example.helpdesk_backend.entity.User;
 import com.example.helpdesk_backend.enums.Priority;
 import com.example.helpdesk_backend.enums.Role;
@@ -76,7 +77,7 @@ class TicketSecurityIntegrationTest {
     void setUpData() {
         attachmentRepository.deleteAll();
         commentRepository.deleteAll();
-        ticketRepository.deleteAll();
+        ticketRepository.deleteAllHard();
         refreshTokenRepository.deleteAll();
         passwordResetTokenRepository.deleteAll();
         userRepository.deleteAll();
@@ -366,12 +367,138 @@ class TicketSecurityIntegrationTest {
         StatusUpdateRequest resolveReq = new StatusUpdateRequest();
         resolveReq.setStatus(Status.RESOLVED);
         resolveReq.setVersion(progressTicket.getVersion());
-        mockMvc.perform(put("/api/tickets/" + ticketId + "/status")
+        String resolveRes = mockMvc.perform(put("/api/tickets/" + ticketId + "/status")
                         .header("Authorization", agentToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(resolveReq)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RESOLVED"))
-                .andExpect(jsonPath("$.resolvedAt").isNotEmpty());
+                .andExpect(jsonPath("$.resolvedAt").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        TicketResponse resolvedTicket = objectMapper.readValue(resolveRes, TicketResponse.class);
+
+        // Reopen ticket from RESOLVED -> OPEN
+        StatusUpdateRequest reopenReq = new StatusUpdateRequest();
+        reopenReq.setStatus(Status.OPEN);
+        reopenReq.setVersion(resolvedTicket.getVersion());
+        mockMvc.perform(put("/api/tickets/" + ticketId + "/status")
+                        .header("Authorization", agentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(reopenReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("OPEN"))
+                .andExpect(jsonPath("$.resolvedAt").isEmpty());
+    }
+
+    @Test
+    void testInternalCommentNotesScoping() throws Exception {
+        TicketRequest ticketReq = new TicketRequest();
+        ticketReq.setTitle("Internal comments scoping test");
+        ticketReq.setDescription("Testing agent internal notes vs customer view");
+        ticketReq.setPriority(Priority.MEDIUM);
+
+        String createRes = mockMvc.perform(post("/api/tickets")
+                        .header("Authorization", customerAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ticketReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        TicketResponse created = objectMapper.readValue(createRes, TicketResponse.class);
+        Long ticketId = created.getId();
+
+        // Assign to agent so agent can act
+        AssignTicketRequest assignReq = new AssignTicketRequest();
+        assignReq.setAgentId(agent.getId());
+        assignReq.setVersion(created.getVersion());
+        mockMvc.perform(put("/api/tickets/" + ticketId + "/assign")
+                        .header("Authorization", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(assignReq)))
+                .andExpect(status().isOk());
+
+        // Customer posts public comment:
+        CommentRequest publicComment = new CommentRequest();
+        publicComment.setMessage("Customer public comment");
+        publicComment.setIsInternal(false);
+        mockMvc.perform(post("/api/tickets/" + ticketId + "/comments")
+                        .header("Authorization", customerAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(publicComment)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.internal").value(false));
+
+        // Customer attempts to post internal note -> forbidden:
+        CommentRequest customerInternalNote = new CommentRequest();
+        customerInternalNote.setMessage("Customer sneaky internal note");
+        customerInternalNote.setIsInternal(true);
+        mockMvc.perform(post("/api/tickets/" + ticketId + "/comments")
+                        .header("Authorization", customerAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(customerInternalNote)))
+                .andExpect(status().isForbidden());
+
+        // Agent posts internal note:
+        CommentRequest agentInternalNote = new CommentRequest();
+        agentInternalNote.setMessage("Agent diagnosis: internal hardware fault");
+        agentInternalNote.setIsInternal(true);
+        mockMvc.perform(post("/api/tickets/" + ticketId + "/comments")
+                        .header("Authorization", agentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(agentInternalNote)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.internal").value(true));
+
+        // Agent fetches comments: sees both public and internal notes (2 total)
+        mockMvc.perform(get("/api/tickets/" + ticketId + "/comments")
+                        .header("Authorization", agentToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+
+        // Customer fetches comments: sees only public comment (1 total, internal filtered out)
+        mockMvc.perform(get("/api/tickets/" + ticketId + "/comments")
+                        .header("Authorization", customerAToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].message").value("Customer public comment"));
+    }
+
+    @Test
+    void testUserDeactivationPreventsLogin() throws Exception {
+        // Register a new customer
+        com.example.helpdesk_backend.dto.UserRequest newCustomer = new com.example.helpdesk_backend.dto.UserRequest();
+        newCustomer.setName("Deactivation Target");
+        newCustomer.setEmail("target@helpdesk.com");
+        newCustomer.setPassword("ValidPassword123!");
+
+        String userRes = mockMvc.perform(post("/api/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(newCustomer)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        UserResponse userResponse = objectMapper.readValue(userRes, UserResponse.class);
+        org.junit.jupiter.api.Assertions.assertTrue(userResponse.isActive());
+
+        // Verify login works initially
+        com.example.helpdesk_backend.dto.LoginRequest loginReq = new com.example.helpdesk_backend.dto.LoginRequest();
+        loginReq.setEmail("target@helpdesk.com");
+        loginReq.setPassword("ValidPassword123!");
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isOk());
+
+        // Admin deactivates user
+        mockMvc.perform(delete("/api/users/" + userResponse.getId())
+                        .header("Authorization", adminToken))
+                .andExpect(status().isNoContent());
+
+        // Login now fails because account is deactivated
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(loginReq)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("User account is deactivated"));
     }
 }

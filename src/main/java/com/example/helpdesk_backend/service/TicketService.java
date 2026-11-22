@@ -15,12 +15,14 @@ import com.example.helpdesk_backend.exception.UserNotFoundException;
 import com.example.helpdesk_backend.repository.CommentRepository;
 import com.example.helpdesk_backend.repository.TicketAttachmentRepository;
 import com.example.helpdesk_backend.repository.TicketRepository;
+import com.example.helpdesk_backend.repository.TicketSpecification;
 import com.example.helpdesk_backend.repository.UserRepository;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -189,9 +191,9 @@ public class TicketService {
                 ACTION_DELETE
         );
 
-        commentRepository.deleteByTicketId(id);
-        ticketAttachmentRepository.deleteByTicketId(id);
-        ticketRepository.delete(ticket);
+        ticket.setDeleted(true);
+        ticketRepository.save(ticket);
+        auditLogService.log("DELETE", "ticket", ticket.getId(), actorId, toSnapshot(ticket), null);
     }
 
     @Transactional
@@ -232,8 +234,8 @@ public class TicketService {
             throw new InvalidTicketStatusException("IN_PROGRESS ticket can only move to RESOLVED");
         }
 
-        if (currentStatus == Status.RESOLVED && newStatus != Status.CLOSED) {
-            throw new InvalidTicketStatusException("RESOLVED ticket can only move to CLOSED");
+        if (currentStatus == Status.RESOLVED && newStatus != Status.CLOSED && newStatus != Status.OPEN) {
+            throw new InvalidTicketStatusException("RESOLVED ticket can only move to CLOSED or OPEN");
         }
 
         if (currentStatus == Status.CLOSED) {
@@ -247,6 +249,8 @@ public class TicketService {
             if (ticket.getSlaDueAt() != null && Instant.now().isAfter(ticket.getSlaDueAt())) {
                 ticket.setSlaBreached(true);
             }
+        } else if (newStatus == Status.OPEN) {
+            ticket.setResolvedAt(null);
         }
 
         Ticket savedTicket = ticketRepository.save(ticket);
@@ -333,84 +337,20 @@ public class TicketService {
         Authentication authentication = getCurrentAuthentication();
         Long userId = getCurrentUserId(authentication);
         String role = getCurrentRole(authentication);
-        String normalizedSearch = normalizeSearch(search);
 
-        if (isAdmin(role)) {
-            if (normalizedSearch != null && status != null && priority != null) {
-                return ticketRepository.findByTitleContainingIgnoreCaseAndStatusAndPriority(normalizedSearch, status, priority, pageable);
-            }
-            if (normalizedSearch != null && status != null) {
-                return ticketRepository.findByTitleContainingIgnoreCaseAndStatus(normalizedSearch, status, pageable);
-            }
-            if (normalizedSearch != null && priority != null) {
-                return ticketRepository.findByTitleContainingIgnoreCaseAndPriority(normalizedSearch, priority, pageable);
-            }
-            if (normalizedSearch != null) {
-                return ticketRepository.findByTitleContainingIgnoreCase(normalizedSearch, pageable);
-            }
-            if (status != null && priority != null) {
-                return ticketRepository.findByStatusAndPriority(status, priority, pageable);
-            }
-            if (status != null) {
-                return ticketRepository.findByStatus(status, pageable);
-            }
-            if (priority != null) {
-                return ticketRepository.findByPriority(priority, pageable);
-            }
-            return ticketRepository.findAll(pageable);
-        }
+        Specification<Ticket> spec = Specification.where(TicketSpecification.hasStatus(status))
+                .and(TicketSpecification.hasPriority(priority))
+                .and(TicketSpecification.searchInTitle(normalizeSearch(search)));
 
         if (isCustomer(role)) {
-            if (normalizedSearch != null && status != null && priority != null) {
-                return ticketRepository.findByCreatedByIdAndTitleContainingIgnoreCaseAndStatusAndPriority(userId, normalizedSearch, status, priority, pageable);
-            }
-            if (normalizedSearch != null && status != null) {
-                return ticketRepository.findByCreatedByIdAndTitleContainingIgnoreCaseAndStatus(userId, normalizedSearch, status, pageable);
-            }
-            if (normalizedSearch != null && priority != null) {
-                return ticketRepository.findByCreatedByIdAndTitleContainingIgnoreCaseAndPriority(userId, normalizedSearch, priority, pageable);
-            }
-            if (normalizedSearch != null) {
-                return ticketRepository.findByCreatedByIdAndTitleContainingIgnoreCase(userId, normalizedSearch, pageable);
-            }
-            if (status != null && priority != null) {
-                return ticketRepository.findByCreatedByIdAndStatusAndPriority(userId, status, priority, pageable);
-            }
-            if (status != null) {
-                return ticketRepository.findByCreatedByIdAndStatus(userId, status, pageable);
-            }
-            if (priority != null) {
-                return ticketRepository.findByCreatedByIdAndPriority(userId, priority, pageable);
-            }
-            return ticketRepository.findByCreatedById(userId, pageable);
+            spec = spec.and(TicketSpecification.createdBy(userId));
+        } else if (isAgent(role)) {
+            spec = spec.and(TicketSpecification.assignedTo(userId));
+        } else if (!isAdmin(role)) {
+            throw new AccessDeniedException(MESSAGE_ACCESS_DENIED);
         }
 
-        if (isAgent(role)) {
-            if (normalizedSearch != null && status != null && priority != null) {
-                return ticketRepository.findByAssignedToIdAndTitleContainingIgnoreCaseAndStatusAndPriority(userId, normalizedSearch, status, priority, pageable);
-            }
-            if (normalizedSearch != null && status != null) {
-                return ticketRepository.findByAssignedToIdAndTitleContainingIgnoreCaseAndStatus(userId, normalizedSearch, status, pageable);
-            }
-            if (normalizedSearch != null && priority != null) {
-                return ticketRepository.findByAssignedToIdAndTitleContainingIgnoreCaseAndPriority(userId, normalizedSearch, priority, pageable);
-            }
-            if (normalizedSearch != null) {
-                return ticketRepository.findByAssignedToIdAndTitleContainingIgnoreCase(userId, normalizedSearch, pageable);
-            }
-            if (status != null && priority != null) {
-                return ticketRepository.findByAssignedToIdAndStatusAndPriority(userId, status, priority, pageable);
-            }
-            if (status != null) {
-                return ticketRepository.findByAssignedToIdAndStatus(userId, status, pageable);
-            }
-            if (priority != null) {
-                return ticketRepository.findByAssignedToIdAndPriority(userId, priority, pageable);
-            }
-            return ticketRepository.findByAssignedToId(userId, pageable);
-        }
-
-        throw new AccessDeniedException(MESSAGE_ACCESS_DENIED);
+        return ticketRepository.findAll(spec, pageable);
     }
 
     @Cacheable(value = "ticketSummary")
@@ -433,6 +373,25 @@ public class TicketService {
             Priority priority = (Priority) row[0];
             long count = ((Number) row[1]).longValue();
             summary.setPriorityCount(priority, count);
+        }
+
+        long totalResolved = ticketRepository.countResolvedOrClosedTickets();
+        long compliant = ticketRepository.countSlaCompliantTickets();
+        double complianceRate = totalResolved > 0 ? ((double) compliant / totalResolved) * 100.0 : 100.0;
+        summary.setSlaComplianceRate(Math.round(complianceRate * 10.0) / 10.0);
+
+        List<Object[]> resolutionTimes = ticketRepository.findResolutionTimes();
+        if (!resolutionTimes.isEmpty()) {
+            double totalHours = 0;
+            for (Object[] row : resolutionTimes) {
+                Instant created = (Instant) row[0];
+                Instant resolved = (Instant) row[1];
+                if (created != null && resolved != null) {
+                    totalHours += Duration.between(created, resolved).toSeconds() / 3600.0;
+                }
+            }
+            double avgHours = totalHours / resolutionTimes.size();
+            summary.setAverageResolutionTimeHours(Math.round(avgHours * 10.0) / 10.0);
         }
 
         return summary;

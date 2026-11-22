@@ -1,0 +1,10 @@
+ALTER TABLE ticket
+    ADD COLUMN deleted BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE users
+    ADD COLUMN active BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE comment
+    ADD COLUMN is_internal BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE INDEX idx_ticket_deleted ON ticket(deleted);

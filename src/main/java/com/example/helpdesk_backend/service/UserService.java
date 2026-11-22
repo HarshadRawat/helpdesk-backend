@@ -81,7 +81,8 @@ public class UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException(id));
 
-        userRepository.delete(user);
+        user.setActive(false);
+        userRepository.save(user);
     }
 
     public UserResponse toResponse(User user) {
@@ -90,6 +91,7 @@ public class UserService {
         response.setName(user.getName());
         response.setEmail(user.getEmail());
         response.setRole(user.getRole());
+        response.setActive(user.isActive());
         return response;
     }
 }

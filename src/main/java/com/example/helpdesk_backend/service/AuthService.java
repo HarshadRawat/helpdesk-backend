@@ -53,6 +53,10 @@ public class AuthService {
             throw new InvalidLoginException("Invalid email or password");
         }
 
+        if (!user.isActive()) {
+            throw new InvalidLoginException("User account is deactivated");
+        }
+
         loginAttemptTracker.recordSuccess(email);
 
         String accessToken = jwtService.generateAccessToken(user);

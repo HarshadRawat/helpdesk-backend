@@ -14,6 +14,24 @@ public class TicketSummaryResponse {
     private long highPriorityTickets;
     private long mediumPriorityTickets;
     private long lowPriorityTickets;
+    private double slaComplianceRate = 100.0;
+    private double averageResolutionTimeHours = 0.0;
+
+    public double getSlaComplianceRate() {
+        return slaComplianceRate;
+    }
+
+    public void setSlaComplianceRate(double slaComplianceRate) {
+        this.slaComplianceRate = slaComplianceRate;
+    }
+
+    public double getAverageResolutionTimeHours() {
+        return averageResolutionTimeHours;
+    }
+
+    public void setAverageResolutionTimeHours(double averageResolutionTimeHours) {
+        this.averageResolutionTimeHours = averageResolutionTimeHours;
+    }
 
     public long getTotalTickets() {
         return totalTickets;

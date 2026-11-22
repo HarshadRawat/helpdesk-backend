@@ -36,12 +36,16 @@ public class TicketAttachmentService {
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "image/jpeg",
             "image/png",
-            "image/webp",
             "application/pdf",
-            "text/plain",
-            "text/csv",
-            "application/json",
-            "application/zip"
+            "text/plain"
+    );
+
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".pdf",
+            ".txt"
     );
 
     private final TicketAttachmentRepository attachmentRepository;
@@ -92,7 +96,16 @@ public class TicketAttachmentService {
         User uploader = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId));
 
-        String storedFileName = UUID.randomUUID() + "_" + originalFilename;
+        String extension = "";
+        int dotIndex = originalFilename.lastIndexOf('.');
+        if (dotIndex >= 0) {
+            extension = originalFilename.substring(dotIndex).toLowerCase();
+        }
+        if (!ALLOWED_EXTENSIONS.contains(extension)) {
+            throw new IllegalArgumentException("Unsupported file extension: " + extension);
+        }
+
+        String storedFileName = UUID.randomUUID() + extension;
         Path targetLocation = this.uploadStorageLocation.resolve(storedFileName).normalize();
 
         try {

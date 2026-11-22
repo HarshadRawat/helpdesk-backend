@@ -9,6 +9,8 @@ public class CommentRequest {
 
     private Long userId;
 
+    private Boolean isInternal;
+
     public String getMessage() {
         return message;
     }
@@ -23,5 +25,13 @@ public class CommentRequest {
 
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+
+    public Boolean getIsInternal() {
+        return isInternal;
+    }
+
+    public void setIsInternal(Boolean isInternal) {
+        this.isInternal = isInternal;
     }
 }

@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 @Entity
+@org.hibernate.annotations.SQLRestriction("deleted = false")
 public class Ticket {
 
     @Id
@@ -49,6 +50,9 @@ public class Ticket {
 
     @Column(name = "resolved_at")
     private Instant resolvedAt;
+
+    @Column(name = "deleted", nullable = false)
+    private boolean deleted = false;
 
     public Ticket() {
     }
@@ -155,5 +159,13 @@ public class Ticket {
 
     public void setResolvedAt(Instant resolvedAt) {
         this.resolvedAt = resolvedAt;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        this.deleted = deleted;
     }
 }

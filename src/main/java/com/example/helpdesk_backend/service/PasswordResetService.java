@@ -52,7 +52,8 @@ public class PasswordResetService {
 
         Optional<User> userOptional = userRepository.findByEmail(email.trim().toLowerCase());
         if (userOptional.isEmpty()) {
-            // Silent return prevents email enumeration
+            // Anti-enumeration: simulate dummy hash calculation so response timing is identical
+            hashToken(UUID.randomUUID().toString());
             return;
         }
 

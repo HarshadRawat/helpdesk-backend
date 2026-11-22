@@ -15,6 +15,10 @@ public class LoginAttemptTracker {
     private final Map<String, AttemptState> attempts = new ConcurrentHashMap<>();
 
     public void recordFailure(String email) {
+        if (attempts.size() > 1000) {
+            attempts.entrySet().removeIf(entry ->
+                    Duration.between(entry.getValue().lastAttempt, Instant.now()).compareTo(lockWindow) > 0);
+        }
         AttemptState state = attempts.computeIfAbsent(email, key -> new AttemptState());
         synchronized (state) {
             if (Duration.between(state.lastAttempt, Instant.now()).compareTo(lockWindow) > 0) {

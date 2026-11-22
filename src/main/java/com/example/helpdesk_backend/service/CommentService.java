@@ -64,11 +64,17 @@ public class CommentService {
             throw new org.springframework.security.access.AccessDeniedException("You cannot comment on this ticket");
         }
 
+        boolean isInternal = Boolean.TRUE.equals(request.getIsInternal());
+        if (isInternal && "ROLE_CUSTOMER".equals(role)) {
+            throw new org.springframework.security.access.AccessDeniedException("Customers cannot post internal notes");
+        }
+
         Comment comment = new Comment();
 
         comment.setMessage(request.getMessage());
         comment.setTicket(ticket);
         comment.setUser(user);
+        comment.setInternal(isInternal);
 
         Comment savedComment = commentRepository.save(comment);
 
@@ -97,8 +103,10 @@ public class CommentService {
             throw new org.springframework.security.access.AccessDeniedException("You cannot view comments for this ticket");
         }
 
+        boolean isCustomer = "ROLE_CUSTOMER".equals(role);
         return commentRepository.findByTicketId(ticketId)
                 .stream()
+                .filter(c -> !isCustomer || !c.isInternal())
                 .map(this::toResponse)
                 .toList();
     }
@@ -113,6 +121,7 @@ public class CommentService {
         response.setUserId(comment.getUser().getId());
         response.setUserName(comment.getUser().getName());
         response.setCreatedAt(comment.getCreatedAt());
+        response.setInternal(comment.isInternal());
 
         return response;
     }

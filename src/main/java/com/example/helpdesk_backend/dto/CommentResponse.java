@@ -11,6 +11,7 @@ public class CommentResponse {
     private String userName;
 
     private Instant createdAt;
+    private boolean isInternal;
 
     public Long getId() {
         return id;
@@ -50,5 +51,13 @@ public class CommentResponse {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public boolean isInternal() {
+        return isInternal;
+    }
+
+    public void setInternal(boolean internal) {
+        isInternal = internal;
     }
 }
