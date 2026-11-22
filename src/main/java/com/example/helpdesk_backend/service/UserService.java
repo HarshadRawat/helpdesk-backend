@@ -20,13 +20,16 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
 
     public UserService(
             UserRepository userRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            RefreshTokenService refreshTokenService) {
 
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.refreshTokenService = refreshTokenService;
     }
 
     public List<User> getAllUsers() {
@@ -83,6 +86,7 @@ public class UserService {
 
         user.setActive(false);
         userRepository.save(user);
+        refreshTokenService.revokeAllActiveTokensForUser(user);
     }
 
     public UserResponse toResponse(User user) {

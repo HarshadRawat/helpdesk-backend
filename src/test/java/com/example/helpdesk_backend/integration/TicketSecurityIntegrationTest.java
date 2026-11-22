@@ -46,6 +46,9 @@ class TicketSecurityIntegrationTest {
     private TicketRepository ticketRepository;
 
     @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
+    @Autowired
     private CommentRepository commentRepository;
 
     @Autowired
@@ -77,7 +80,7 @@ class TicketSecurityIntegrationTest {
     void setUpData() {
         attachmentRepository.deleteAll();
         commentRepository.deleteAll();
-        ticketRepository.deleteAllHard();
+        jdbcTemplate.execute("DELETE FROM ticket");
         refreshTokenRepository.deleteAll();
         passwordResetTokenRepository.deleteAll();
         userRepository.deleteAll();
@@ -132,6 +135,7 @@ class TicketSecurityIntegrationTest {
         updateReq.setTitle("Malicious Title Update");
         updateReq.setDescription("Customer B trying to update Customer A's ticket");
         updateReq.setPriority(Priority.HIGH);
+        updateReq.setVersion(createdTicket.getVersion());
 
         mockMvc.perform(put("/api/tickets/" + ticketId)
                         .header("Authorization", customerBToken)
@@ -159,6 +163,7 @@ class TicketSecurityIntegrationTest {
 
         AssignTicketRequest assignReq = new AssignTicketRequest();
         assignReq.setAgentId(agent.getId());
+        assignReq.setVersion(createdTicket.getVersion());
 
         mockMvc.perform(put("/api/tickets/" + ticketId + "/assign")
                         .header("Authorization", customerAToken)
@@ -166,15 +171,18 @@ class TicketSecurityIntegrationTest {
                         .content(objectMapper.writeValueAsString(assignReq)))
                 .andExpect(status().isForbidden());
 
-        mockMvc.perform(put("/api/tickets/" + ticketId + "/assign")
+        String assignRes = mockMvc.perform(put("/api/tickets/" + ticketId + "/assign")
                         .header("Authorization", adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(assignReq)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.assignedToId").value(agent.getId()));
+                .andExpect(jsonPath("$.assignedToId").value(agent.getId()))
+                .andReturn().getResponse().getContentAsString();
+        TicketResponse assignedTicket = objectMapper.readValue(assignRes, TicketResponse.class);
 
         StatusUpdateRequest invalidJump = new StatusUpdateRequest();
         invalidJump.setStatus(Status.RESOLVED);
+        invalidJump.setVersion(assignedTicket.getVersion());
 
         mockMvc.perform(put("/api/tickets/" + ticketId + "/status")
                         .header("Authorization", agentToken)
@@ -184,6 +192,7 @@ class TicketSecurityIntegrationTest {
 
         StatusUpdateRequest validProgress = new StatusUpdateRequest();
         validProgress.setStatus(Status.IN_PROGRESS);
+        validProgress.setVersion(assignedTicket.getVersion());
 
         mockMvc.perform(put("/api/tickets/" + ticketId + "/status")
                         .header("Authorization", agentToken)
@@ -244,7 +253,9 @@ class TicketSecurityIntegrationTest {
 
         mockMvc.perform(get("/api/audit/tickets/" + ticketId)
                         .header("Authorization", adminToken))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].newValue").isNotEmpty())
+                .andExpect(jsonPath("$[0].newValue").value(org.hamcrest.Matchers.containsString("\"title\"")));
     }
 
     @Test

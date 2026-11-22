@@ -168,4 +168,17 @@ public class Ticket {
     public void setDeleted(boolean deleted) {
         this.deleted = deleted;
     }
+
+    @PrePersist
+    public void onPrePersist() {
+        if (this.createdAt == null) {
+            this.createdAt = Instant.now();
+        }
+        this.updatedAt = Instant.now();
+    }
+
+    @PreUpdate
+    public void onPreUpdate() {
+        this.updatedAt = Instant.now();
+    }
 }

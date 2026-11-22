@@ -77,26 +77,22 @@ class RateLimitFilterTest {
     }
 
     @Test
-    void shouldUseXForwardedForHeaderToIsolateUsersBehindProxy() throws ServletException, IOException {
-        // Both requests arrive from Nginx proxy socket (127.0.0.1), but have distinct client IPs in X-Forwarded-For
+    void shouldIsolateUsersByRemoteAddress() throws ServletException, IOException {
         MockHttpServletRequest aliceReq1 = new MockHttpServletRequest("POST", "/api/auth/login");
-        aliceReq1.setRemoteAddr("127.0.0.1");
-        aliceReq1.addHeader("X-Forwarded-For", "203.0.113.10, 127.0.0.1");
+        aliceReq1.setRemoteAddr("203.0.113.10");
         MockHttpServletResponse aliceRes1 = new MockHttpServletResponse();
         rateLimitFilter.doFilterInternal(aliceReq1, aliceRes1, filterChain);
         assertEquals(200, aliceRes1.getStatus());
 
         MockHttpServletRequest aliceReq2 = new MockHttpServletRequest("POST", "/api/auth/login");
-        aliceReq2.setRemoteAddr("127.0.0.1");
-        aliceReq2.addHeader("X-Forwarded-For", "203.0.113.10");
+        aliceReq2.setRemoteAddr("203.0.113.10");
         MockHttpServletResponse aliceRes2 = new MockHttpServletResponse();
         rateLimitFilter.doFilterInternal(aliceReq2, aliceRes2, filterChain);
         assertEquals(200, aliceRes2.getStatus());
 
-        // Alice is now at limit (2). Bob sends a request from different IP through the same Nginx proxy:
+        // Alice is now at limit (2). Bob sends a request from different IP:
         MockHttpServletRequest bobReq = new MockHttpServletRequest("POST", "/api/auth/login");
-        bobReq.setRemoteAddr("127.0.0.1");
-        bobReq.addHeader("X-Forwarded-For", "198.51.100.25");
+        bobReq.setRemoteAddr("198.51.100.25");
         MockHttpServletResponse bobRes = new MockHttpServletResponse();
         rateLimitFilter.doFilterInternal(bobReq, bobRes, filterChain);
         assertEquals(200, bobRes.getStatus()); // Bob is NOT blocked by Alice's quota!

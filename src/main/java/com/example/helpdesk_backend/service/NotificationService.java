@@ -5,8 +5,10 @@ import com.example.helpdesk_backend.entity.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -15,10 +17,14 @@ public class NotificationService {
     private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
 
     private final JavaMailSender mailSender;
+    private final String frontendUrl;
 
     @Autowired
-    public NotificationService(JavaMailSender mailSender) {
+    public NotificationService(
+            JavaMailSender mailSender,
+            @Value("${app.frontend.url:http://localhost:8080}") String frontendUrl) {
         this.mailSender = mailSender;
+        this.frontendUrl = frontendUrl;
     }
 
     public void sendTicketStatusNotification(Ticket ticket, User user, String oldStatus, String newStatus) {
@@ -47,12 +53,13 @@ public class NotificationService {
         sendEmail(agent.getEmail(), subject, message);
     }
 
+    @Async
     public void sendPasswordResetNotification(User user, String resetToken) {
         if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
             return;
         }
 
-        String resetUrl = "http://localhost:8080/reset-password?token=" + resetToken;
+        String resetUrl = frontendUrl + "/reset-password?token=" + resetToken;
         String subject = "HelpDesk - Password Reset Request";
         String message = "Hello " + user.getName() + ",\n\n"
                 + "A password reset request was received for your account.\n"
@@ -62,6 +69,20 @@ public class NotificationService {
                 + "This link will expire in 15 minutes. If you did not request this, please ignore this email.";
 
         sendEmail(user.getEmail(), subject, message);
+    }
+
+    @Async
+    public void sendSlaBreachAlert(Ticket ticket) {
+        String adminEmail = "admin@localhost";
+        String subject = "🚨 SLA Breach Alert - Ticket #" + ticket.getId();
+        String message = "Hello Admin,\n\n"
+                + "Ticket #" + ticket.getId() + " ('" + ticket.getTitle() + "') has breached its SLA resolution deadline.\n"
+                + "Priority: " + ticket.getPriority() + "\n"
+                + "Due At: " + ticket.getSlaDueAt() + "\n"
+                + "Assigned Agent: " + (ticket.getAssignedTo() != null ? ticket.getAssignedTo().getName() : "Unassigned") + "\n\n"
+                + "Please review and take escalation measures.";
+
+        sendEmail(adminEmail, subject, message);
     }
 
     private void sendEmail(String to, String subject, String message) {

@@ -15,6 +15,7 @@ public class TicketUpdateRequest {
     @NotNull
     private Priority priority;
 
+    @NotNull(message = "Version is required for optimistic concurrency control")
     private Long version;
 
     public String getTitle() {

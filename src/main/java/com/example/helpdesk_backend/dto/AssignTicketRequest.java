@@ -7,6 +7,7 @@ public class AssignTicketRequest {
     @NotNull
     private Long agentId;
 
+    @NotNull(message = "Version is required for optimistic concurrency control")
     private Long version;
 
     public Long getAgentId() {

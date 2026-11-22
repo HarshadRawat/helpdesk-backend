@@ -155,7 +155,7 @@ public class TicketService {
                 ACTION_UPDATE
         );
 
-        if (request.getVersion() != null && !request.getVersion().equals(ticket.getVersion())) {
+        if (request.getVersion() == null || !request.getVersion().equals(ticket.getVersion())) {
             throw new ObjectOptimisticLockingFailureException(Ticket.class, id);
         }
 
@@ -209,7 +209,7 @@ public class TicketService {
 
         assertCanActOnTicket(ticket, actorId, role, ACTION_UPDATE);
 
-        if (request.getVersion() != null && !request.getVersion().equals(ticket.getVersion())) {
+        if (request.getVersion() == null || !request.getVersion().equals(ticket.getVersion())) {
             throw new ObjectOptimisticLockingFailureException(Ticket.class, id);
         }
 
@@ -306,7 +306,7 @@ public class TicketService {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new TicketNotFoundException(ticketId));
 
-        if (request.getVersion() != null && !request.getVersion().equals(ticket.getVersion())) {
+        if (request.getVersion() == null || !request.getVersion().equals(ticket.getVersion())) {
             throw new ObjectOptimisticLockingFailureException(Ticket.class, ticketId);
         }
 

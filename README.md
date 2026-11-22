@@ -101,10 +101,9 @@ flowchart TD
 
 ```text
 helpdesk-backend/
-├── docker/                             # Docker deployment configurations
-│   ├── mysql/init/                     # Database seed scripts
-│   ├── nginx/                          # Reverse proxy config
-│   └── docker-compose.yml              # Local production-like orchestrator
+├── docker-compose.yml                  # Multi-container production orchestrator (app, mysql, nginx, mailpit)
+├── Dockerfile                          # Multi-stage container build (build & minimal non-root runtime)
+├── nginx.conf                          # Upstream reverse proxy configuration
 ├── src/
 │   ├── main/
 │   │   ├── java/com/example/helpdesk_backend/
@@ -262,15 +261,32 @@ Explore the API documentation at `http://localhost:8080/swagger-ui.html`.
 The backend includes a production-ready multi-container Docker Compose configuration:
 
 ```bash
-cd docker
 docker compose up -d --build
 ```
 
 Services launched:
-- **`helpdesk-backend`**: Spring Boot application running on port `8080` (management on `8081`).
-- **`mysql`**: MySQL 8.0 server with automated initialization scripts and health probes.
-- **`nginx`**: Reverse proxy routing requests with rate-limiting and connection buffering.
-- **`mailpit`**: Mock SMTP server and web interface for inspecting sent emails at `http://localhost:8025`.
+- **`helpdesk-backend`**: Spring Boot application running on port `8080` (management actuator on `8081`).
+- **`mysql`**: MySQL 8.0 server with automated initialization scripts and health probes (port `33306`).
+- **`nginx`**: Reverse proxy routing requests to the application on port `18088`.
+- **`mailpit`**: Mock SMTP server (`11025`) and web interface for inspecting sent notification emails at `http://localhost:18025`.
+
+---
+
+## ⚖️ Architectural & Production Trade-offs
+
+This project is architected with realistic trade-offs suitable for medium-scale enterprise deployments and cleanly decouples areas for high-scale cloud migration:
+
+1. **In-Memory Rate Limiting vs Distributed Rate Limiting**:
+   - *Current Implementation*: Uses in-memory token bucket algorithms (`RateLimitFilter`) mapped per client IP, operating with reverse proxy header security (`server.forward-headers-strategy=framework`).
+   - *Production Trade-off*: Zero external infrastructure overhead for single-instance or sticky-session deployments. In a horizontally scaled, multi-instance production cluster behind a load balancer, rate limits should be backed by a centralized distributed store like **Redis** (e.g., Bucket4j Redis integration) or enforced at the cloud API Gateway layer (AWS API Gateway, Cloudflare, Envoy).
+
+2. **Local Disk Attachments vs Cloud Object Storage**:
+   - *Current Implementation*: Ticket attachments are validated for MIME type / size and saved to a mounted persistent volume (`/app/uploads`).
+   - *Production Trade-off*: Simple and isolated without external cloud IAM configurations. In a containerized Kubernetes or multi-region cluster, file storage should be abstracted to an S3-compatible object store (**Amazon S3**, **Google Cloud Storage**, or **MinIO**) using pre-signed upload/download URLs to prevent pod disk saturation.
+
+3. **Upstream TLS / SSL Termination**:
+   - *Current Implementation*: The containerized Spring Boot application runs plaintext HTTP internally (ports 8080/8081).
+   - *Production Trade-off*: Enterprise standard practice terminates TLS/SSL upstream at the reverse proxy (Nginx), Kubernetes Ingress Controller, or cloud load balancer (e.g., AWS ALB / Cloudflare). The application securely reconstructs scheme, host, and client IPs using standard `X-Forwarded-*` headers handled by Spring's `ForwardedHeaderFilter`.
 
 ---
 
@@ -284,5 +300,5 @@ Services launched:
 - [x] **Performance Optimization**: In-memory caching for expensive analytical aggregates with automatic eviction.
 - [x] **File Safety**: MIME whitelist enforcement, file-size guards, and sanitized disk storage.
 - [x] **Observability**: Prometheus metrics export, structured MDC request correlation, and audit logging.
-- [x] **Automated Testing**: 47 tests covering unit, MockMvc security, caching, and domain logic.
+- [x] **Automated Testing**: Comprehensive test suite covering unit, MockMvc security, caching, MySQL migrations, and domain logic.
 - [x] **Interactive Documentation**: OpenAPI 3.0 / Swagger UI integration with JWT Bearer support.

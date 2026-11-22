@@ -20,10 +20,15 @@ public class SlaEscalationService {
 
     private final TicketRepository ticketRepository;
     private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
 
-    public SlaEscalationService(TicketRepository ticketRepository, AuditLogService auditLogService) {
+    public SlaEscalationService(
+            TicketRepository ticketRepository,
+            AuditLogService auditLogService,
+            NotificationService notificationService) {
         this.ticketRepository = ticketRepository;
         this.auditLogService = auditLogService;
+        this.notificationService = notificationService;
     }
 
     @Scheduled(cron = "${app.sla.check-cron:0 */15 * * * *}")
@@ -46,6 +51,7 @@ public class SlaEscalationService {
             ticketRepository.save(ticket);
             auditLogService.log("SLA_BREACH", "ticket", ticket.getId(), 0L, "SLA_MET", "SLA_BREACHED");
             log.warn("Ticket #{} has breached SLA. Due at: {}", ticket.getId(), ticket.getSlaDueAt());
+            notificationService.sendSlaBreachAlert(ticket);
         }
 
         return breachedTickets.size();

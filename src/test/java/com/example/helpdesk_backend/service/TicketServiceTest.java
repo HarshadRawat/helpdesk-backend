@@ -116,12 +116,14 @@ class TicketServiceTest {
         ticket.setTitle("Sample");
         ticket.setStatus(Status.OPEN);
         ticket.setCreatedBy(creator);
+        ticket.setVersion(0L);
 
         when(ticketRepository.findById(10L)).thenReturn(Optional.of(ticket));
         when(ticketRepository.save(any(Ticket.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         StatusUpdateRequest request = new StatusUpdateRequest();
         request.setStatus(Status.IN_PROGRESS);
+        request.setVersion(0L);
 
         Ticket updated = ticketService.updateTicketStatus(10L, request);
 
@@ -135,11 +137,13 @@ class TicketServiceTest {
         Ticket ticket = new Ticket();
         ReflectionTestUtils.setField(ticket, "id", 12L);
         ticket.setStatus(Status.OPEN);
+        ticket.setVersion(0L);
 
         when(ticketRepository.findById(12L)).thenReturn(Optional.of(ticket));
 
         StatusUpdateRequest request = new StatusUpdateRequest();
         request.setStatus(Status.RESOLVED);
+        request.setVersion(0L);
 
         assertThrows(InvalidTicketStatusException.class, () -> ticketService.updateTicketStatus(12L, request));
         verify(ticketRepository, never()).save(any());
@@ -150,6 +154,7 @@ class TicketServiceTest {
     void assignTicketShouldValidateAgentAndPublishEvent() {
         Ticket ticket = new Ticket();
         ReflectionTestUtils.setField(ticket, "id", 33L);
+        ticket.setVersion(0L);
 
         User agent = new User();
         ReflectionTestUtils.setField(agent, "id", 2L);
@@ -161,6 +166,7 @@ class TicketServiceTest {
 
         AssignTicketRequest request = new AssignTicketRequest();
         request.setAgentId(2L);
+        request.setVersion(0L);
 
         Ticket assigned = ticketService.assignTicket(33L, request);
 
@@ -172,6 +178,7 @@ class TicketServiceTest {
     void assignTicketShouldRejectNonAgent() {
         Ticket ticket = new Ticket();
         ReflectionTestUtils.setField(ticket, "id", 33L);
+        ticket.setVersion(0L);
 
         User customer = new User();
         ReflectionTestUtils.setField(customer, "id", 3L);
@@ -182,6 +189,7 @@ class TicketServiceTest {
 
         AssignTicketRequest request = new AssignTicketRequest();
         request.setAgentId(3L);
+        request.setVersion(0L);
 
         assertThrows(InvalidTicketAssignmentException.class, () -> ticketService.assignTicket(33L, request));
         verify(ticketRepository, never()).save(any());

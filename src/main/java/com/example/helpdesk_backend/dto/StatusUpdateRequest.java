@@ -8,6 +8,7 @@ public class StatusUpdateRequest {
     @NotNull
     private Status status;
 
+    @NotNull(message = "Version is required for optimistic concurrency control")
     private Long version;
 
     public Status getStatus() {

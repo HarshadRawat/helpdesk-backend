@@ -43,6 +43,12 @@ public class RefreshTokenService {
             throw new InvalidLoginException("Refresh token reuse detected. Please login again.");
         }
 
+        if (!storedToken.getUser().isActive()) {
+            revokeToken(storedToken, null);
+            revokeAllActiveTokensForUser(storedToken.getUser().getId());
+            throw new InvalidLoginException("User account is deactivated");
+        }
+
         Instant now = Instant.now();
         if (storedToken.getExpiresAt() == null || !storedToken.getExpiresAt().isAfter(now)) {
             revokeToken(storedToken, null);

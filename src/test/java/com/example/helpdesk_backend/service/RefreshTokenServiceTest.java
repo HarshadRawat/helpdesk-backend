@@ -114,6 +114,31 @@ class RefreshTokenServiceTest {
     }
 
     @Test
+    void rotateShouldRejectDeactivatedUserAndRevokeTokens() {
+        User user = user(9L);
+        user.setActive(false);
+        String oldToken = "deactivated-user-token";
+        String oldTokenId = "deactivated-jti";
+
+        RefreshToken stored = new RefreshToken(
+                oldTokenId,
+                hash(oldToken),
+                user,
+                Instant.now().plusSeconds(3600)
+        );
+
+        when(jwtService.isRefreshToken(oldToken)).thenReturn(true);
+        when(jwtService.extractUserId(oldToken)).thenReturn("9");
+        when(jwtService.extractTokenId(oldToken)).thenReturn(oldTokenId);
+        when(refreshTokenRepository.findByTokenId(oldTokenId)).thenReturn(Optional.of(stored));
+
+        InvalidLoginException ex = assertThrows(InvalidLoginException.class, () -> refreshTokenService.rotate(oldToken));
+        assertEquals("User account is deactivated", ex.getMessage());
+        assertNotNull(stored.getRevokedAt());
+        verify(refreshTokenRepository).save(stored);
+    }
+
+    @Test
     void rotateShouldRejectTokenThatExpiresAtCurrentTime() {
         User user = user(8L);
         String edgeToken = "edge-refresh-token";
