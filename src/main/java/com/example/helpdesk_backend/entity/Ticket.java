@@ -7,7 +7,6 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "ticket")
 public class Ticket {
 
     @Id
@@ -41,6 +40,15 @@ public class Ticket {
 
     @Column(name = "sla_breached", nullable = false)
     private boolean slaBreached = false;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt = Instant.now();
+
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt = Instant.now();
+
+    @Column(name = "resolved_at")
+    private Instant resolvedAt;
 
     public Ticket() {
     }
@@ -123,5 +131,29 @@ public class Ticket {
 
     public void setSlaBreached(boolean slaBreached) {
         this.slaBreached = slaBreached;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(Instant updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public Instant getResolvedAt() {
+        return resolvedAt;
+    }
+
+    public void setResolvedAt(Instant resolvedAt) {
+        this.resolvedAt = resolvedAt;
     }
 }

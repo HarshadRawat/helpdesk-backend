@@ -2,6 +2,8 @@ package com.example.helpdesk_backend.entity;
 
 import jakarta.persistence.*;
 
+import java.time.Instant;
+
 @Entity
 public class Comment {
 
@@ -18,6 +20,9 @@ public class Comment {
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User user;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt = Instant.now();
 
     public Long getId() {
         return id;
@@ -45,5 +50,13 @@ public class Comment {
 
     public void setUser(User user) {
         this.user = user;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
     }
 }

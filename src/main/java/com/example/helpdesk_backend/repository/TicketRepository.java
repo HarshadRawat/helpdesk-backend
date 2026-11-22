@@ -157,4 +157,13 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
             @Param("now") Instant now,
             @Param("excludedStatuses") List<Status> excludedStatuses
     );
+
+    @Query("SELECT t.status, COUNT(t) FROM Ticket t GROUP BY t.status")
+    List<Object[]> countTicketsByStatus();
+
+    @Query("SELECT t.priority, COUNT(t) FROM Ticket t GROUP BY t.priority")
+    List<Object[]> countTicketsByPriority();
+
+    @Query("SELECT t.assignedTo.id, t.assignedTo.name, COUNT(t) FROM Ticket t WHERE t.assignedTo IS NOT NULL AND t.status IN :activeStatuses GROUP BY t.assignedTo.id, t.assignedTo.name ORDER BY COUNT(t) DESC")
+    List<Object[]> countActiveTicketsByAgent(@Param("activeStatuses") List<Status> activeStatuses);
 }

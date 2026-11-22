@@ -23,6 +23,10 @@ public class TicketResponse {
     private Instant slaDueAt;
     private boolean slaBreached;
 
+    private Instant createdAt;
+    private Instant updatedAt;
+    private Instant resolvedAt;
+
     public Long getId() {
         return id;
     }
@@ -117,5 +121,29 @@ public class TicketResponse {
 
     public void setSlaBreached(boolean slaBreached) {
         this.slaBreached = slaBreached;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(Instant updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public Instant getResolvedAt() {
+        return resolvedAt;
+    }
+
+    public void setResolvedAt(Instant resolvedAt) {
+        this.resolvedAt = resolvedAt;
     }
 }

@@ -312,4 +312,66 @@ class TicketSecurityIntegrationTest {
         org.junit.jupiter.api.Assertions.assertFalse(ticketRepository.existsById(ticketId));
         org.junit.jupiter.api.Assertions.assertTrue(commentRepository.findByTicketId(ticketId).isEmpty());
     }
+
+    @Test
+    void testUrgentPrioritySlaAndTimestamps() throws Exception {
+        TicketRequest ticketReq = new TicketRequest();
+        ticketReq.setTitle("Urgent production outage");
+        ticketReq.setDescription("Database down in US-East");
+        ticketReq.setPriority(Priority.URGENT);
+
+        String createRes = mockMvc.perform(post("/api/tickets")
+                        .header("Authorization", customerAToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(ticketReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.priority").value("URGENT"))
+                .andExpect(jsonPath("$.createdAt").isNotEmpty())
+                .andExpect(jsonPath("$.updatedAt").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+
+        TicketResponse created = objectMapper.readValue(createRes, TicketResponse.class);
+        Long ticketId = created.getId();
+
+        // Urgent SLA due must be within 4 hours
+        java.time.Instant now = java.time.Instant.now();
+        org.junit.jupiter.api.Assertions.assertTrue(created.getSlaDueAt().isAfter(now.plus(java.time.Duration.ofHours(3))));
+        org.junit.jupiter.api.Assertions.assertTrue(created.getSlaDueAt().isBefore(now.plus(java.time.Duration.ofHours(5))));
+
+        // Admin assigns to agent:
+        AssignTicketRequest assignReq = new AssignTicketRequest();
+        assignReq.setAgentId(agent.getId());
+        assignReq.setVersion(created.getVersion());
+        String assignRes = mockMvc.perform(put("/api/tickets/" + ticketId + "/assign")
+                        .header("Authorization", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(assignReq)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        TicketResponse assignedTicket = objectMapper.readValue(assignRes, TicketResponse.class);
+
+        // Assigned agent moves to IN_PROGRESS:
+        StatusUpdateRequest inProgress = new StatusUpdateRequest();
+        inProgress.setStatus(Status.IN_PROGRESS);
+        inProgress.setVersion(assignedTicket.getVersion());
+        String inProgressRes = mockMvc.perform(put("/api/tickets/" + ticketId + "/status")
+                        .header("Authorization", agentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(inProgress)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        TicketResponse progressTicket = objectMapper.readValue(inProgressRes, TicketResponse.class);
+
+        // Move to RESOLVED
+        StatusUpdateRequest resolveReq = new StatusUpdateRequest();
+        resolveReq.setStatus(Status.RESOLVED);
+        resolveReq.setVersion(progressTicket.getVersion());
+        mockMvc.perform(put("/api/tickets/" + ticketId + "/status")
+                        .header("Authorization", agentToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(resolveReq)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.resolvedAt").isNotEmpty());
+    }
 }

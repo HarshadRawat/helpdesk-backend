@@ -10,8 +10,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -55,13 +59,14 @@ public class PasswordResetService {
         User user = userOptional.get();
         tokenRepository.deleteByUser(user);
 
-        String token = UUID.randomUUID().toString();
+        String rawToken = UUID.randomUUID().toString();
+        String hashedToken = hashToken(rawToken);
         Instant expiry = Instant.now().plus(tokenValidityDuration);
 
-        PasswordResetToken resetToken = new PasswordResetToken(token, user, expiry);
+        PasswordResetToken resetToken = new PasswordResetToken(hashedToken, user, expiry);
         tokenRepository.save(resetToken);
 
-        notificationService.sendPasswordResetNotification(user, token);
+        notificationService.sendPasswordResetNotification(user, rawToken);
     }
 
     @Transactional
@@ -70,7 +75,8 @@ public class PasswordResetService {
             throw new InvalidLoginException("Reset token is required");
         }
 
-        PasswordResetToken resetToken = tokenRepository.findByTokenAndUsedFalse(token.trim())
+        String hashedToken = hashToken(token.trim());
+        PasswordResetToken resetToken = tokenRepository.findByTokenAndUsedFalse(hashedToken)
                 .orElseThrow(() -> new InvalidLoginException("Invalid or expired password reset token"));
 
         if (resetToken.getExpiryDate().isBefore(Instant.now())) {
@@ -88,5 +94,15 @@ public class PasswordResetService {
 
         resetToken.setUsed(true);
         tokenRepository.save(resetToken);
+    }
+
+    private String hashToken(String rawToken) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm unavailable", e);
+        }
     }
 }

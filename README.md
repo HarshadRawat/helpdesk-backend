@@ -5,7 +5,7 @@
 [![Spring Security](https://img.shields.io/badge/Security-Spring%20Security%207-blue.svg)](https://spring.io/projects/spring-security)
 [![Database](https://img.shields.io/badge/Database-MySQL%20%7C%20Flyway-blue.svg)](https://flywaydb.org/)
 [![Architecture](https://img.shields.io/badge/Architecture-Event--Driven%20%7C%20Cached-purple.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-44%20Passed-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-45%20Passed-success.svg)]()
 
 A production-grade, enterprise-ready IT Operations and HelpDesk Ticket Management backend built with **Spring Boot 4**, **Java 17**, and **Spring Security**. Engineered for high reliability, concurrent workloads, real-world data isolation, and regulatory audit compliance.
 
@@ -72,7 +72,7 @@ flowchart TD
 - **HTTP 409 Conflict Resolution**: Catches `OptimisticLockingFailureException` and returns human-readable diagnostic error payloads instructing callers to reload current state.
 
 ### 3. ⏱️ Dynamic SLA Engine & Background Escalation
-- **Priority-Driven Deadlines**: Automatically calculates resolution targets upon creation (Urgent: 4 hours, High: 24 hours, Medium: 72 hours).
+- **Priority-Driven Deadlines**: Automatically calculates resolution targets upon creation (Urgent: 4 hours, High: 24 hours, Medium: 72 hours, Low: 120 hours).
 - **Scheduled Escalation Worker**: An automated background job (`@Scheduled(cron = "${app.sla.check-cron}")`) continuously monitors and flags breached tickets using composite indexing (`idx_tickets_sla_breach`).
 - **Audit Logging of Breaches**: Automatically appends immutable SLA breach events to the ticket audit trail.
 
@@ -120,10 +120,10 @@ helpdesk-backend/
 │   │   │   ├── security/               # JWT filters, Rate limiters, MDC Tracers
 │   │   │   └── service/                # Business logic, SLA worker, Attachments, Caching
 │   │   └── resources/
-│   │       ├── db/migration/           # Versioned Flyway SQL migrations (V1 to V4)
+│   │       ├── db/migration/           # Versioned Flyway SQL migrations (V1 to V5)
 │   │       ├── application.properties  # Base configuration
 │   │       └── application-prod.properties
-│   └── test/                           # 44 Unit & Integration tests
+│   └── test/                           # 45 Unit & Integration tests
 │       └── java/com/example/helpdesk_backend/
 │           ├── event/                  # Event listener tests
 │           ├── integration/            # MockMvc RBAC, Auth, and Security integration tests
@@ -140,10 +140,11 @@ The database schema is managed via **Flyway** migrations:
 
 | Migration | Scope | Description |
 |---|---|---|
-| `V1__init_schema.sql` | Core Tables | Creates `users`, `tickets`, and `comments` tables. |
-| `V2__refresh_tokens_and_audit_logs.sql` | Security & Audit | Creates `refresh_tokens`, `audit_logs`, `password_reset_tokens`, and `ticket_attachments`. |
-| `V3__performance_indexes.sql` | Query Optimization | Composite indexing on ticket status, priority, and foreign keys. |
-| `V4__add_optimistic_locking_and_sla.sql` | Concurrency & SLA | Adds `version` column for optimistic locking, `sla_due_at`, `sla_breached` flags, and breach composite index. |
+| `V1__create_initial_schema.sql` | Core Tables | Creates `users`, `tickets`, and `comments` tables. |
+| `V2__create_audit_log.sql` | Security & Audit | Creates `audit_logs` table for regulatory change tracking. |
+| `V3__harden_refresh_token_rotation.sql` | Token Hardening | Adds `family_id` and revoked tracking on refresh tokens for compromise isolation. |
+| `V4__add_optimistic_locking_and_sla.sql` | Concurrency & SLA | Adds `@Version` column for optimistic locking, `sla_due_at`, and `sla_breached` status flags. |
+| `V5__add_timestamps_and_metrics.sql` | Timestamps & Audit | Adds `created_at`, `updated_at`, `resolved_at` on tickets and `created_at` on comments. |
 
 ---
 
@@ -202,7 +203,7 @@ Interactive Swagger UI documentation is available at **`/swagger-ui.html`**.
 
 ## 🧪 Comprehensive Test Suite
 
-The project includes **44 automated tests** spanning unit, integration, and security layers:
+The project includes **45 automated tests** spanning unit, integration, and security layers:
 
 ```bash
 # Run all tests via Maven Wrapper
@@ -282,5 +283,5 @@ Services launched:
 - [x] **Performance Optimization**: In-memory caching for expensive analytical aggregates with automatic eviction.
 - [x] **File Safety**: MIME whitelist enforcement, file-size guards, and sanitized disk storage.
 - [x] **Observability**: Prometheus metrics export, structured MDC request correlation, and audit logging.
-- [x] **Automated Testing**: 44 tests covering unit, MockMvc security, caching, and domain logic.
+- [x] **Automated Testing**: 45 tests covering unit, MockMvc security, caching, and domain logic.
 - [x] **Interactive Documentation**: OpenAPI 3.0 / Swagger UI integration with JWT Bearer support.

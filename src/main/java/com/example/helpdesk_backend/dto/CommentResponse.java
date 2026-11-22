@@ -1,5 +1,7 @@
 package com.example.helpdesk_backend.dto;
 
+import java.time.Instant;
+
 public class CommentResponse {
 
     private Long id;
@@ -7,6 +9,8 @@ public class CommentResponse {
 
     private Long userId;
     private String userName;
+
+    private Instant createdAt;
 
     public Long getId() {
         return id;
@@ -38,5 +42,13 @@ public class CommentResponse {
 
     public void setUserName(String userName) {
         this.userName = userName;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
     }
 }

@@ -10,6 +10,7 @@ public class TicketSummaryResponse {
     private long inProgressTickets;
     private long resolvedTickets;
     private long closedTickets;
+    private long urgentPriorityTickets;
     private long highPriorityTickets;
     private long mediumPriorityTickets;
     private long lowPriorityTickets;
@@ -54,6 +55,14 @@ public class TicketSummaryResponse {
         this.closedTickets = closedTickets;
     }
 
+    public long getUrgentPriorityTickets() {
+        return urgentPriorityTickets;
+    }
+
+    public void setUrgentPriorityTickets(long urgentPriorityTickets) {
+        this.urgentPriorityTickets = urgentPriorityTickets;
+    }
+
     public long getHighPriorityTickets() {
         return highPriorityTickets;
     }
@@ -78,6 +87,27 @@ public class TicketSummaryResponse {
         this.lowPriorityTickets = lowPriorityTickets;
     }
 
+    public void setStatusCount(Status status, long count) {
+        if (status == null) return;
+        switch (status) {
+            case OPEN -> openTickets = count;
+            case IN_PROGRESS -> inProgressTickets = count;
+            case RESOLVED -> resolvedTickets = count;
+            case CLOSED -> closedTickets = count;
+        }
+        totalTickets = openTickets + inProgressTickets + resolvedTickets + closedTickets;
+    }
+
+    public void setPriorityCount(Priority priority, long count) {
+        if (priority == null) return;
+        switch (priority) {
+            case URGENT -> urgentPriorityTickets = count;
+            case HIGH -> highPriorityTickets = count;
+            case MEDIUM -> mediumPriorityTickets = count;
+            case LOW -> lowPriorityTickets = count;
+        }
+    }
+
     public void addStatusCount(Status status) {
         if (status == null) {
             return;
@@ -87,8 +117,6 @@ public class TicketSummaryResponse {
             case IN_PROGRESS -> inProgressTickets++;
             case RESOLVED -> resolvedTickets++;
             case CLOSED -> closedTickets++;
-            default -> {
-            }
         }
         totalTickets++;
     }
@@ -98,11 +126,10 @@ public class TicketSummaryResponse {
             return;
         }
         switch (priority) {
+            case URGENT -> urgentPriorityTickets++;
             case HIGH -> highPriorityTickets++;
             case MEDIUM -> mediumPriorityTickets++;
             case LOW -> lowPriorityTickets++;
-            default -> {
-            }
         }
     }
 }

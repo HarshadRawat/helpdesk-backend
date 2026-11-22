@@ -242,6 +242,12 @@ public class TicketService {
 
         Status previousStatus = ticket.getStatus();
         ticket.setStatus(newStatus);
+        if (newStatus == Status.RESOLVED) {
+            ticket.setResolvedAt(Instant.now());
+            if (ticket.getSlaDueAt() != null && Instant.now().isAfter(ticket.getSlaDueAt())) {
+                ticket.setSlaBreached(true);
+            }
+        }
 
         Ticket savedTicket = ticketRepository.save(ticket);
         auditLogService.log("STATUS_CHANGE", "ticket", savedTicket.getId(), actorId, previousStatus, newStatus);
@@ -279,6 +285,9 @@ public class TicketService {
         response.setVersion(ticket.getVersion());
         response.setSlaDueAt(ticket.getSlaDueAt());
         response.setSlaBreached(ticket.isSlaBreached());
+        response.setCreatedAt(ticket.getCreatedAt());
+        response.setUpdatedAt(ticket.getUpdatedAt());
+        response.setResolvedAt(ticket.getResolvedAt());
 
         return response;
     }
@@ -411,12 +420,19 @@ public class TicketService {
             throw new AccessDeniedException("Only admins can view ticket summary");
         }
 
-        List<Ticket> tickets = ticketRepository.findAll();
         TicketSummaryResponse summary = new TicketSummaryResponse();
+        List<Object[]> statusCounts = ticketRepository.countTicketsByStatus();
+        for (Object[] row : statusCounts) {
+            Status status = (Status) row[0];
+            long count = ((Number) row[1]).longValue();
+            summary.setStatusCount(status, count);
+        }
 
-        for (Ticket ticket : tickets) {
-            summary.addStatusCount(ticket.getStatus());
-            summary.addPriorityCount(ticket.getPriority());
+        List<Object[]> priorityCounts = ticketRepository.countTicketsByPriority();
+        for (Object[] row : priorityCounts) {
+            Priority priority = (Priority) row[0];
+            long count = ((Number) row[1]).longValue();
+            summary.setPriorityCount(priority, count);
         }
 
         return summary;
@@ -429,16 +445,15 @@ public class TicketService {
             throw new AccessDeniedException("Only admins can view agent workload");
         }
 
-        return userRepository.findAll().stream()
-                .filter(user -> user.getRole() == com.example.helpdesk_backend.enums.Role.AGENT)
-                .map(user -> {
+        List<Object[]> agentCounts = ticketRepository.countActiveTicketsByAgent(List.of(Status.OPEN, Status.IN_PROGRESS));
+        return agentCounts.stream()
+                .map(row -> {
                     AgentWorkloadResponse response = new AgentWorkloadResponse();
-                    response.setAgentId(user.getId());
-                    response.setAgentName(user.getName());
-                    response.setAssignedTickets(ticketRepository.findByAssignedToId(user.getId()).size());
+                    response.setAgentId(((Number) row[0]).longValue());
+                    response.setAgentName((String) row[1]);
+                    response.setAssignedTickets(((Number) row[2]).longValue());
                     return response;
                 })
-                .sorted(Comparator.comparingLong(AgentWorkloadResponse::getAssignedTickets).reversed())
                 .toList();
     }
 
@@ -537,9 +552,10 @@ public class TicketService {
             return Instant.now().plus(Duration.ofHours(24));
         }
         return switch (priority) {
-            case HIGH -> Instant.now().plus(Duration.ofHours(4));
-            case MEDIUM -> Instant.now().plus(Duration.ofHours(24));
-            case LOW -> Instant.now().plus(Duration.ofHours(72));
+            case URGENT -> Instant.now().plus(Duration.ofHours(4));
+            case HIGH -> Instant.now().plus(Duration.ofHours(24));
+            case MEDIUM -> Instant.now().plus(Duration.ofHours(72));
+            case LOW -> Instant.now().plus(Duration.ofHours(120));
         };
     }
 

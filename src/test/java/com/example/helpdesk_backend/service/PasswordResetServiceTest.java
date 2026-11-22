@@ -90,7 +90,7 @@ class PasswordResetServiceTest {
                 Instant.now().plus(Duration.ofMinutes(10))
         );
 
-        when(tokenRepository.findByTokenAndUsedFalse("valid-token")).thenReturn(Optional.of(resetToken));
+        when(tokenRepository.findByTokenAndUsedFalse(anyString())).thenReturn(Optional.of(resetToken));
         when(passwordEncoder.encode("newPassword123!")).thenReturn("new-encoded-password");
 
         passwordResetService.resetPassword("valid-token", "newPassword123!");
@@ -111,7 +111,7 @@ class PasswordResetServiceTest {
                 Instant.now().minus(Duration.ofMinutes(5))
         );
 
-        when(tokenRepository.findByTokenAndUsedFalse("expired-token")).thenReturn(Optional.of(expiredToken));
+        when(tokenRepository.findByTokenAndUsedFalse(anyString())).thenReturn(Optional.of(expiredToken));
 
         assertThrows(InvalidLoginException.class, () -> passwordResetService.resetPassword("expired-token", "newPassword123!"));
         assertTrue(expiredToken.isUsed());
