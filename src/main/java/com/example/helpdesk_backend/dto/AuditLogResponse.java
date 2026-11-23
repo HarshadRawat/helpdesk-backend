@@ -9,6 +9,8 @@ public class AuditLogResponse {
     private String entityType;
     private Long entityId;
     private Long actorId;
+    private String performedByName;
+    private String performedByRole;
     private String oldValue;
     private String newValue;
     private Instant createdAt;
@@ -19,6 +21,22 @@ public class AuditLogResponse {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getPerformedByName() {
+        return performedByName;
+    }
+
+    public void setPerformedByName(String performedByName) {
+        this.performedByName = performedByName;
+    }
+
+    public String getPerformedByRole() {
+        return performedByRole;
+    }
+
+    public void setPerformedByRole(String performedByRole) {
+        this.performedByRole = performedByRole;
     }
 
     public String getAction() {

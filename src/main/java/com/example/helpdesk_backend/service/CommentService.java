@@ -98,7 +98,7 @@ public class CommentService {
                 .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Access denied"));
 
         if (!"ROLE_ADMIN".equals(role)
-                && !("ROLE_AGENT".equals(role) && ticket.getAssignedTo() != null && ticket.getAssignedTo().getId().equals(userId))
+                && !"ROLE_AGENT".equals(role)
                 && !("ROLE_CUSTOMER".equals(role) && ticket.getCreatedBy() != null && ticket.getCreatedBy().getId().equals(userId))) {
             throw new org.springframework.security.access.AccessDeniedException("You cannot view comments for this ticket");
         }

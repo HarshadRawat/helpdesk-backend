@@ -28,6 +28,12 @@ public class AuditLogController {
         this.auditLogService = auditLogService;
     }
 
+    @GetMapping
+    @Operation(summary = "Get all audit logs", description = "Retrieves all system audit records in descending chronological order.")
+    public List<AuditLogResponse> getAllAuditLogs() {
+        return auditLogService.getAllAuditLogs();
+    }
+
     @GetMapping("/tickets/{ticketId}")
     @Operation(summary = "Get ticket audit trail", description = "Retrieves chronological lifecycle and status audit events for a ticket.")
     public List<AuditLogResponse> getTicketHistory(@PathVariable Long ticketId) {

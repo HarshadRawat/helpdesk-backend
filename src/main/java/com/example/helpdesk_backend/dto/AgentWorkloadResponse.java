@@ -4,6 +4,7 @@ public class AgentWorkloadResponse {
 
     private Long agentId;
     private String agentName;
+    private String email;
     private long assignedTickets;
 
     public Long getAgentId() {
@@ -20,6 +21,14 @@ public class AgentWorkloadResponse {
 
     public void setAgentName(String agentName) {
         this.agentName = agentName;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 
     public long getAssignedTickets() {

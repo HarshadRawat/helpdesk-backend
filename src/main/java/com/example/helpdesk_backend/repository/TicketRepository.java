@@ -41,6 +41,8 @@ public interface TicketRepository extends JpaRepository<Ticket, Long>, JpaSpecif
     @Query("SELECT COUNT(t) FROM Ticket t WHERE t.status IN (com.example.helpdesk_backend.enums.Status.RESOLVED, com.example.helpdesk_backend.enums.Status.CLOSED) AND t.slaBreached = false")
     long countSlaCompliantTickets();
 
+    long countBySlaBreachedTrue();
+
     @Query("SELECT t.createdAt, t.resolvedAt FROM Ticket t WHERE t.resolvedAt IS NOT NULL")
     List<Object[]> findResolutionTimes();
 }

@@ -317,6 +317,11 @@ public class TicketService {
         }
 
         User previousAgent = ticket.getAssignedTo();
+        if (previousAgent != null && previousAgent.getId().equals(agent.getId())) {
+            throw new InvalidTicketAssignmentException(
+                    "Ticket is already assigned to this agent (" + agent.getName() + ")"
+            );
+        }
         ticket.setAssignedTo(agent);
 
         Ticket savedTicket = ticketRepository.save(ticket);
@@ -340,55 +345,97 @@ public class TicketService {
 
         if (isCustomer(role)) {
             spec = spec.and(TicketSpecification.createdBy(userId));
-        } else if (isAgent(role)) {
-            spec = spec.and(TicketSpecification.assignedTo(userId));
-        } else if (!isAdmin(role)) {
+        } else if (!isAgent(role) && !isAdmin(role)) {
             throw new AccessDeniedException(MESSAGE_ACCESS_DENIED);
         }
 
         return ticketRepository.findAll(spec, pageable);
     }
 
-    @Cacheable(value = "ticketSummary")
+    @Cacheable(value = "ticketSummary", condition = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication() != null and T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getAuthorities().?[authority == 'ROLE_ADMIN'].size() > 0")
     public TicketSummaryResponse getTicketSummary() {
-        String role = getCurrentRole(getCurrentAuthentication());
-        if (!isAdmin(role)) {
-            throw new AccessDeniedException("Only admins can view ticket summary");
-        }
+        Authentication authentication = getCurrentAuthentication();
+        Long userId = getCurrentUserId(authentication);
+        String role = getCurrentRole(authentication);
 
         TicketSummaryResponse summary = new TicketSummaryResponse();
-        List<Object[]> statusCounts = ticketRepository.countTicketsByStatus();
-        for (Object[] row : statusCounts) {
-            Status status = (Status) row[0];
-            long count = ((Number) row[1]).longValue();
-            summary.setStatusCount(status, count);
-        }
 
-        List<Object[]> priorityCounts = ticketRepository.countTicketsByPriority();
-        for (Object[] row : priorityCounts) {
-            Priority priority = (Priority) row[0];
-            long count = ((Number) row[1]).longValue();
-            summary.setPriorityCount(priority, count);
-        }
-
-        long totalResolved = ticketRepository.countResolvedOrClosedTickets();
-        long compliant = ticketRepository.countSlaCompliantTickets();
-        double complianceRate = totalResolved > 0 ? ((double) compliant / totalResolved) * 100.0 : 100.0;
-        summary.setSlaComplianceRate(Math.round(complianceRate * 10.0) / 10.0);
-
-        List<Object[]> resolutionTimes = ticketRepository.findResolutionTimes();
-        if (!resolutionTimes.isEmpty()) {
-            double totalHours = 0;
-            for (Object[] row : resolutionTimes) {
-                Instant created = (Instant) row[0];
-                Instant resolved = (Instant) row[1];
-                if (created != null && resolved != null) {
-                    totalHours += Duration.between(created, resolved).toSeconds() / 3600.0;
-                }
+        if (isAdmin(role)) {
+            List<Object[]> statusCounts = ticketRepository.countTicketsByStatus();
+            for (Object[] row : statusCounts) {
+                Status status = (Status) row[0];
+                long count = ((Number) row[1]).longValue();
+                summary.setStatusCount(status, count);
             }
-            double avgHours = totalHours / resolutionTimes.size();
-            summary.setAverageResolutionTimeHours(Math.round(avgHours * 10.0) / 10.0);
+
+            List<Object[]> priorityCounts = ticketRepository.countTicketsByPriority();
+            for (Object[] row : priorityCounts) {
+                Priority priority = (Priority) row[0];
+                long count = ((Number) row[1]).longValue();
+                summary.setPriorityCount(priority, count);
+            }
+
+            long totalResolved = ticketRepository.countResolvedOrClosedTickets();
+            long compliant = ticketRepository.countSlaCompliantTickets();
+            double complianceRate = totalResolved > 0 ? ((double) compliant / totalResolved) * 100.0 : 100.0;
+            summary.setSlaComplianceRate(Math.round(complianceRate * 10.0) / 10.0);
+            summary.setSlaBreachedTickets(ticketRepository.countBySlaBreachedTrue());
+
+            List<Object[]> resolutionTimes = ticketRepository.findResolutionTimes();
+            if (!resolutionTimes.isEmpty()) {
+                double totalHours = 0;
+                for (Object[] row : resolutionTimes) {
+                    Instant created = (Instant) row[0];
+                    Instant resolved = (Instant) row[1];
+                    if (created != null && resolved != null) {
+                        totalHours += Duration.between(created, resolved).toSeconds() / 3600.0;
+                    }
+                }
+                double avgHours = totalHours / resolutionTimes.size();
+                summary.setAverageResolutionTimeHours(Math.round(avgHours * 10.0) / 10.0);
+            }
+
+            return summary;
         }
+
+        // CUSTOMER or AGENT: return scoped metrics
+        List<Ticket> accessibleTickets;
+        if (isCustomer(role)) {
+            accessibleTickets = ticketRepository.findByCreatedById(userId);
+        } else if (isAgent(role)) {
+            accessibleTickets = ticketRepository.findByAssignedToId(userId);
+        } else {
+            return summary;
+        }
+
+        long openCount = 0;
+        long inProgressCount = 0;
+        long resolvedCount = 0;
+        long closedCount = 0;
+        long breachedCount = 0;
+
+        for (Ticket ticket : accessibleTickets) {
+            if (ticket.getStatus() == Status.OPEN) {
+                openCount++;
+            } else if (ticket.getStatus() == Status.IN_PROGRESS) {
+                inProgressCount++;
+            } else if (ticket.getStatus() == Status.RESOLVED) {
+                resolvedCount++;
+            } else if (ticket.getStatus() == Status.CLOSED) {
+                closedCount++;
+            }
+
+            if (ticket.isSlaBreached()) {
+                breachedCount++;
+            }
+        }
+
+        summary.setOpenTickets(openCount);
+        summary.setInProgressTickets(inProgressCount);
+        summary.setResolvedTickets(resolvedCount);
+        summary.setClosedTickets(closedCount);
+        summary.setTotalTickets(accessibleTickets.size());
+        summary.setSlaBreachedTickets(breachedCount);
 
         return summary;
     }
@@ -396,19 +443,40 @@ public class TicketService {
     @Cacheable(value = "agentWorkload")
     public List<AgentWorkloadResponse> getAgentWorkload() {
         String role = getCurrentRole(getCurrentAuthentication());
-        if (!isAdmin(role)) {
-            throw new AccessDeniedException("Only admins can view agent workload");
+        if (!isAdmin(role) && !isAgent(role)) {
+            throw new AccessDeniedException("Only admins and agents can view agent workload");
         }
 
         List<Object[]> agentCounts = ticketRepository.countActiveTicketsByAgent(List.of(Status.OPEN, Status.IN_PROGRESS));
-        return agentCounts.stream()
-                .map(row -> {
+        java.util.Map<Long, Long> countsMap = new java.util.HashMap<>();
+        for (Object[] row : agentCounts) {
+            countsMap.put(((Number) row[0]).longValue(), ((Number) row[2]).longValue());
+        }
+
+        List<User> agents = userRepository.findByRole(Role.AGENT);
+        if (agents.isEmpty()) {
+            return agentCounts.stream()
+                    .map(row -> {
+                        AgentWorkloadResponse response = new AgentWorkloadResponse();
+                        response.setAgentId(((Number) row[0]).longValue());
+                        response.setAgentName((String) row[1]);
+                        response.setAssignedTickets(((Number) row[2]).longValue());
+                        return response;
+                    })
+                    .toList();
+        }
+
+        return agents.stream()
+                .filter(User::isActive)
+                .map(agent -> {
                     AgentWorkloadResponse response = new AgentWorkloadResponse();
-                    response.setAgentId(((Number) row[0]).longValue());
-                    response.setAgentName((String) row[1]);
-                    response.setAssignedTickets(((Number) row[2]).longValue());
+                    response.setAgentId(agent.getId());
+                    response.setAgentName(agent.getName());
+                    response.setEmail(agent.getEmail());
+                    response.setAssignedTickets(countsMap.getOrDefault(agent.getId(), 0L));
                     return response;
                 })
+                .sorted((a, b) -> Long.compare(b.getAssignedTickets(), a.getAssignedTickets()))
                 .toList();
     }
 
@@ -491,6 +559,9 @@ public class TicketService {
         }
 
         if (isAgent(role)) {
+            if (ACTION_VIEW.equals(action)) {
+                return;
+            }
             if (ticket.getAssignedTo() != null
                     && ticket.getAssignedTo().getId().equals(userId)) {
                 return;

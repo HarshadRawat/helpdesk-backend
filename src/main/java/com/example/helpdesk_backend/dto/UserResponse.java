@@ -26,6 +26,14 @@ public class UserResponse {
         this.name = name;
     }
 
+    public String getFullName() {
+        return name;
+    }
+
+    public void setFullName(String fullName) {
+        this.name = fullName;
+    }
+
     public String getEmail() {
         return email;
     }

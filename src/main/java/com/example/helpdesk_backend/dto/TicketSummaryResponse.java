@@ -14,8 +14,25 @@ public class TicketSummaryResponse {
     private long highPriorityTickets;
     private long mediumPriorityTickets;
     private long lowPriorityTickets;
+    private long slaBreachedTickets;
     private double slaComplianceRate = 100.0;
     private double averageResolutionTimeHours = 0.0;
+
+    public long getSlaBreachedTickets() {
+        return slaBreachedTickets;
+    }
+
+    public void setSlaBreachedTickets(long slaBreachedTickets) {
+        this.slaBreachedTickets = slaBreachedTickets;
+    }
+
+    public long getBreachedSlaTickets() {
+        return slaBreachedTickets;
+    }
+
+    public void setBreachedSlaTickets(long breachedSlaTickets) {
+        this.slaBreachedTickets = breachedSlaTickets;
+    }
 
     public double getSlaComplianceRate() {
         return slaComplianceRate;

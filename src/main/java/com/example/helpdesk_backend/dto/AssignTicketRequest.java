@@ -18,6 +18,14 @@ public class AssignTicketRequest {
         this.agentId = agentId;
     }
 
+    public Long getAssignedToId() {
+        return agentId;
+    }
+
+    public void setAssignedToId(Long assignedToId) {
+        this.agentId = assignedToId;
+    }
+
     public Long getVersion() {
         return version;
     }

@@ -162,19 +162,12 @@ public class TicketAttachmentService {
     }
 
     private void assertCanAccessTicket(Ticket ticket, Long userId, String role, String action) {
-        if ("ROLE_ADMIN".equals(role)) {
+        if ("ROLE_ADMIN".equals(role) || "ROLE_AGENT".equals(role)) {
             return;
         }
 
         if ("ROLE_CUSTOMER".equals(role)) {
             if (ticket.getCreatedBy() != null && ticket.getCreatedBy().getId().equals(userId)) {
-                return;
-            }
-            throw new AccessDeniedException("You cannot " + action + " this ticket");
-        }
-
-        if ("ROLE_AGENT".equals(role)) {
-            if (ticket.getAssignedTo() != null && ticket.getAssignedTo().getId().equals(userId)) {
                 return;
             }
             throw new AccessDeniedException("You cannot " + action + " this ticket");
