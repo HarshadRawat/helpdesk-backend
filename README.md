@@ -5,7 +5,7 @@
 [![Spring Security](https://img.shields.io/badge/Security-Spring%20Security%207-blue.svg)](https://spring.io/projects/spring-security)
 [![Database](https://img.shields.io/badge/Database-MySQL%20%7C%20Flyway-blue.svg)](https://flywaydb.org/)
 [![Architecture](https://img.shields.io/badge/Architecture-Event--Driven%20%7C%20Cached-purple.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-47%20Passed-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-49%20Passed-success.svg)]()
 
 A production-grade, enterprise-ready IT Operations and HelpDesk Ticket Management backend built with **Spring Boot 4**, **Java 17**, and **Spring Security**. Engineered for high reliability, concurrent workloads, real-world data isolation, and regulatory audit compliance.
 
@@ -71,29 +71,47 @@ flowchart TD
 - **`@Version` Optimistic Concurrency**: Ticket entities utilize database versioning to prevent lost updates when multiple agents update the same ticket simultaneously.
 - **HTTP 409 Conflict Resolution**: Catches `OptimisticLockingFailureException` and returns human-readable diagnostic error payloads instructing callers to reload current state.
 
-### 3. ⏱️ Dynamic SLA Engine & Background Escalation
+### 3. 👥 ITIL 4 Support Swarming & Collaborative Internal Notes
+- **Collaborative Team Queue**: All active IT support agents (`ROLE_AGENT`) have visibility across the organization's ticket queue.
+- **Dual-Channel Comment Isolation**: Technicians can record amber-badged **Internal IT Notes** for shift handovers and diagnostic notes that are permanently filtered out from employee views (`ROLE_CUSTOMER`).
+- **Ownership Lifecycle Guards**: Any peer agent can contribute internal diagnostic notes (Support Swarming), but only the assigned technician or an Administrator can alter ticket lifecycle status (`OPEN` $\rightarrow$ `IN_PROGRESS` $\rightarrow$ `RESOLVED`).
+- **Duplicate Assignment Guard**: Throws `InvalidTicketAssignmentException` (HTTP 400) if an admin re-assigns a ticket to the already assigned technician, preventing redundant audit log pollution.
+
+### 4. ⏱️ Dynamic SLA Engine & Background Escalation
 - **Priority-Driven Deadlines**: Automatically calculates resolution targets upon creation (Urgent: 4 hours, High: 24 hours, Medium: 72 hours, Low: 120 hours).
 - **Scheduled Escalation Worker**: An automated background job (`@Scheduled(cron = "${app.sla.check-cron}")`) continuously monitors and flags breached tickets using composite indexing (`idx_tickets_sla_breach`).
 - **Audit Logging of Breaches**: Automatically appends immutable SLA breach events to the ticket audit trail.
 
-### 4. 📬 Asynchronous Decoupled Event System
+### 5. 📬 Asynchronous Decoupled Event System
 - **Transactional Domain Events**: Emits `TicketStatusChangedEvent` and `TicketAssignedEvent` upon state transitions.
 - **After-Commit Execution**: Event listeners use `@TransactionalEventListener(phase = AFTER_COMMIT)` to ensure emails and side-effects are only dispatched if the database transaction commits successfully.
 - **Dedicated Thread Pool**: Bound to an isolated `ThreadPoolTaskExecutor` (`helpdesk-async-*`) so external notification latency never degrades API response times.
 
-### 5. 📎 Secure Multipart File Attachments
+### 6. 📎 Secure Multipart File Attachments
 - **MIME Whitelisting & Size Caps**: Accepts documents and images (`application/pdf`, `image/png`, `image/jpeg`, `text/plain`) with strict 10MB request filtering.
 - **Path-Traversal Prevention**: Sanitizes file paths, stores payloads using randomized UUIDs, and enforces caller authorization before streaming file resources back.
 
-### 6. 📊 Analytical Query Caching
+### 7. 📊 Analytical Query Caching
 - **Multi-Level Metric Caching**: Highly frequent read endpoints (`/api/tickets/summary` and `/api/tickets/agent-workload`) are cached in-memory with `@Cacheable`.
 - **Targeted Cache Eviction**: Every ticket creation, status update, assignment, or SLA breach immediately purges stale metrics via `@CacheEvict(allEntries = true)`.
 
-### 7. 🔍 Enterprise Observability & Tracing
+### 8. 🔍 Enterprise Observability & Tracing
 - **Correlation IDs (MDC)**: Generates or propagates `X-Request-Id` across all HTTP logs and responses.
 - **Sliding-Window Rate Limiting**: In-memory token bucket per IP to protect public auth endpoints from abuse.
 - **Spring Boot Actuator & Prometheus**: Metrics exposed at `/actuator/prometheus` for Grafana scraping, health checks at `/actuator/health`.
 - **Audit Retention Policy**: Configurable retention window with an automated/admin-triggered cleanup job (`DELETE /api/audit/cleanup`).
+
+---
+
+## 👥 Pre-Seeded Demonstration Personas
+
+| Role | Name | Email | Password | Primary Capabilities |
+| :--- | :--- | :--- | :--- | :--- |
+| **System Admin** | Admin User | `admin@example.com` | `Admin@123` | Org-wide analytics, technician assignment, staff directory, audit trail |
+| **IT Support (Lead)** | Alex Rivera | `support@example.com` | `Support@123` | Queue triage, status resolution, collaborative internal notes, capacity monitoring |
+| **IT Support (Infra)**| Marcus Vance| `marcus.vance@example.com` | `Support@123` | Queue triage, infrastructure consultation, peer internal notes |
+| **Employee** | Sarah Connor | `employee@example.com` | `Employee@123`| Self-service portal, incident creation, public discussions |
+| **Employee** | John Doe | `john.doe@example.com` | `Employee@123`| Self-service portal, hardware requests |
 
 ---
 
@@ -203,7 +221,7 @@ Interactive Swagger UI documentation is available at **`/swagger-ui.html`**.
 
 ## 🧪 Comprehensive Test Suite
 
-The project includes **47 automated tests** spanning unit, integration, and security layers:
+The project includes **49 automated tests** spanning unit, integration, and security layers:
 
 ```bash
 # Run all tests via Maven Wrapper
