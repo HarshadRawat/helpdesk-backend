@@ -107,7 +107,6 @@ flowchart TD
 
 | Role | Name | Email | Password | Primary Capabilities |
 | :--- | :--- | :--- | :--- | :--- |
-| **System Admin** | Admin User | `admin@example.com` | `Admin@123` | Org-wide analytics, technician assignment, staff directory, audit trail |
 | **IT Support (Lead)** | Alex Rivera | `support@example.com` | `Support@123` | Queue triage, status resolution, collaborative internal notes, capacity monitoring |
 | **IT Support (Infra)**| Marcus Vance| `marcus.vance@example.com` | `Support@123` | Queue triage, infrastructure consultation, peer internal notes |
 | **Employee** | Sarah Connor | `employee@example.com` | `Employee@123`| Self-service portal, incident creation, public discussions |
