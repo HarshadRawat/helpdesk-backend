@@ -9,6 +9,8 @@
 
 A production-grade, enterprise-ready IT Operations and HelpDesk Ticket Management backend built with **Spring Boot 4**, **Java 17**, and **Spring Security**. Engineered for high reliability, concurrent workloads, real-world data isolation, and regulatory audit compliance.
 
+🔗 **Frontend Web Portal**: [https://github.com/HarshadRawat/helpdesk-frontend](https://github.com/HarshadRawat/helpdesk-frontend)
+
 ---
 
 ## 🌟 Architectural Highlights
