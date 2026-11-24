@@ -40,7 +40,7 @@ public class AdminBootstrap {
             CommentRepository commentRepository,
             AuditLogRepository auditLogRepository,
             PasswordEncoder passwordEncoder,
-            @Value("${app.bootstrap.admin.enabled:${APP_BOOTSTRAP_ADMIN_ENABLED:true}}") boolean enabled,
+            @Value("${app.bootstrap.admin.enabled:false}") boolean enabled,
             @Value("${app.bootstrap.admin.name:${APP_BOOTSTRAP_ADMIN_NAME:System Administrator}}") String adminName,
             @Value("${app.bootstrap.admin.email:${APP_BOOTSTRAP_ADMIN_EMAIL:admin@example.com}}") String adminEmail,
             @Value("${app.bootstrap.admin.password:${APP_BOOTSTRAP_ADMIN_PASSWORD:Admin@SecureOps2026!}}") String adminPassword) {

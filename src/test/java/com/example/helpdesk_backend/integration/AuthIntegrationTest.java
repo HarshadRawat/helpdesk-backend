@@ -39,6 +39,12 @@ class AuthIntegrationTest {
     private UserRepository userRepository;
 
     @Autowired
+    private com.example.helpdesk_backend.repository.TicketRepository ticketRepository;
+
+    @Autowired
+    private com.example.helpdesk_backend.repository.CommentRepository commentRepository;
+
+    @Autowired
     private RefreshTokenRepository refreshTokenRepository;
 
     @Autowired
@@ -48,6 +54,8 @@ class AuthIntegrationTest {
     void cleanUp() {
         passwordResetTokenRepository.deleteAll();
         refreshTokenRepository.deleteAll();
+        commentRepository.deleteAll();
+        ticketRepository.deleteAll();
         userRepository.deleteAll();
     }
 
