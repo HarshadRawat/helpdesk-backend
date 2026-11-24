@@ -40,10 +40,10 @@ public class AdminBootstrap {
             CommentRepository commentRepository,
             AuditLogRepository auditLogRepository,
             PasswordEncoder passwordEncoder,
-            @Value("${app.bootstrap.admin.enabled:false}") boolean enabled,
-            @Value("${app.bootstrap.admin.name:Admin}") String adminName,
-            @Value("${app.bootstrap.admin.email:${APP_BOOTSTRAP_ADMIN_EMAIL:admin@localhost}}") String adminEmail,
-            @Value("${app.bootstrap.admin.password:${APP_BOOTSTRAP_ADMIN_PASSWORD:ChangeMe123!}}") String adminPassword) {
+            @Value("${app.bootstrap.admin.enabled:${APP_BOOTSTRAP_ADMIN_ENABLED:true}}") boolean enabled,
+            @Value("${app.bootstrap.admin.name:${APP_BOOTSTRAP_ADMIN_NAME:System Administrator}}") String adminName,
+            @Value("${app.bootstrap.admin.email:${APP_BOOTSTRAP_ADMIN_EMAIL:admin@example.com}}") String adminEmail,
+            @Value("${app.bootstrap.admin.password:${APP_BOOTSTRAP_ADMIN_PASSWORD:Admin@SecureOps2026!}}") String adminPassword) {
         this.userRepository = userRepository;
         this.ticketRepository = ticketRepository;
         this.commentRepository = commentRepository;
@@ -63,12 +63,14 @@ public class AdminBootstrap {
         }
 
         // 1. Primary Admin User
-        User admin = userRepository.findByEmail(adminEmail.toLowerCase()).orElse(null);
+        String targetAdminEmail = (adminEmail != null && !adminEmail.isBlank()) ? adminEmail.toLowerCase() : "admin@example.com";
+        User admin = userRepository.findByEmail(targetAdminEmail).orElse(null);
         if (admin == null) {
             admin = new User();
-            admin.setName(adminName);
-            admin.setEmail(adminEmail.toLowerCase());
-            admin.setPassword(passwordEncoder.encode(adminPassword));
+            admin.setName(adminName != null && !adminName.isBlank() ? adminName : "System Administrator");
+            admin.setEmail(targetAdminEmail);
+            String pwd = (adminPassword != null && !adminPassword.isBlank()) ? adminPassword : "Admin@SecureOps2026!";
+            admin.setPassword(passwordEncoder.encode(pwd));
             admin.setRole(Role.ADMIN);
             admin = userRepository.save(admin);
         }

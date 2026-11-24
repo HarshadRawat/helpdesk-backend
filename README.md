@@ -9,6 +9,16 @@
 
 A production-grade, enterprise-ready IT Operations and HelpDesk Ticket Management backend built with **Spring Boot 4**, **Java 17**, and **Spring Security**. Engineered for high reliability, concurrent workloads, real-world data isolation, and regulatory audit compliance.
 
+---
+
+## 🌐 Live Deployed Application
+
+| Service | Live Deployment URL | Description |
+| :--- | :--- | :--- |
+| **Frontend Web Portal** | [https://harshadrawat.github.io/helpdesk-frontend/](https://harshadrawat.github.io/helpdesk-frontend/) | Production Vue 3 Single Page Application hosted on GitHub Pages |
+| **Backend REST API** | [https://helpdesk-backend-production-7f4522ed.up.railway.app](https://helpdesk-backend-production-7f4522ed.up.railway.app) | Production Spring Boot 3 REST API hosted on Railway |
+| **Swagger UI Documentation** | [https://helpdesk-backend-production-7f4522ed.up.railway.app/swagger-ui/index.html](https://helpdesk-backend-production-7f4522ed.up.railway.app/swagger-ui/index.html) | Interactive OpenAPI 3.0 API explorer & test console |
+
 🔗 **Frontend Web Portal**: [https://github.com/HarshadRawat/helpdesk-frontend](https://github.com/HarshadRawat/helpdesk-frontend)
 
 ---
@@ -113,6 +123,9 @@ flowchart TD
 | **IT Support (Infra)**| Marcus Vance| `marcus.vance@example.com` | `Support@123` | Queue triage, infrastructure consultation, peer internal notes |
 | **Employee** | Sarah Connor | `employee@example.com` | `Employee@123`| Self-service portal, incident creation, public discussions |
 | **Employee** | John Doe | `john.doe@example.com` | `Employee@123`| Self-service portal, hardware requests |
+
+> [!NOTE]
+> **Administrator Notice**: System Administrator credentials are intentionally omitted for security and configured exclusively via secure environment variables (`APP_BOOTSTRAP_ADMIN_PASSWORD`).
 
 ---
 
