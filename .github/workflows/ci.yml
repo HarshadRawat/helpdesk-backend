@@ -21,18 +21,21 @@ jobs:
           java-version: '17'
           cache: maven
 
+      - name: Make Maven wrapper executable
+        run: chmod +x ./mvnw
+
       - name: Run tests
-        run: bash ./mvnw test
+        run: mvn test || ./mvnw test
 
       - name: Build project
-        run: bash ./mvnw clean package -DskipTests
+        run: mvn clean package -DskipTests || ./mvnw clean package -DskipTests
 
       - name: Smoke test startup and health endpoint
         run: |
           export SPRING_PROFILES_ACTIVE=test
           export SERVER_PORT=8082
           export MANAGEMENT_PORT=8082
-          bash ./mvnw spring-boot:run > app.log 2>&1 &
+          (mvn spring-boot:run -Dspring-boot.run.profiles=test || ./mvnw spring-boot:run -Dspring-boot.run.profiles=test) > app.log 2>&1 &
           APP_PID=$!
 
           for i in $(seq 1 60); do
